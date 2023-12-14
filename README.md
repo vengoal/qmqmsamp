@@ -16,6 +16,6 @@ https://github.com/vengoal/qmqmsamp/blob/main/qclsrc/MBRLIST.txt
 
 ## Reference
 <ul>
-<li><a href="https://www.ibm.com/docs/en/ibm-mq/9.3?topic=reference-i-application-programming-ilerpg" target="_blank"> IBM i Application Programming Reference (ILE/RPG)</a></li>
-</li><a href="https://public.dhe.ibm.com/software/integration/library/books/amqwak00.pdf">Application Programming Reference (ILE RPG) PDF</a></li>
+  <li><a href="https://www.ibm.com/docs/en/ibm-mq/9.3?topic=reference-i-application-programming-ilerpg" target="_blank"> IBM i Application Programming Reference (ILE/RPG)</a></li>
+  <li><a href="https://public.dhe.ibm.com/software/integration/library/books/amqwak00.pdf">Application Programming Reference (ILE RPG) PDF</a></li>
 </ul>
