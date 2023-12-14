@@ -1,0 +1,58 @@
+Member      Type        Text                                              
+AMQSACT0    C           C SAMPLE DISPLAY ACTIVITY TRACE                   
+AMQSAEM0    C           C SAMPLE API EXIT WITH MESSAGE PROPERTIES         
+AMQSAICL    C           C SAMPLE MQAI INQUIRE CHANNELS                    
+AMQSAIC4    C           C SAMPLE MQAI CREATE QUEUE                        
+AMQSAIE4    C           C SAMPLE MQAI EVENT MONITOR                       
+AMQSAIL4    C           C SAMPLE MQAI INQUIRE                             
+AMQSAPT0    C           C SAMPLE ASYNCHRONOUS PUT                         
+AMQSAXE0    C           C SAMPLE API EXIT                                 
+AMQSBCG4    C           C SAMPLE BROWSE MESSAGE DESCRIPTOR                
+AMQSCBF0    C           C SAMPLE CALLBACK FUNCTION                        
+AMQSCLMA    C           C SAMPLE CLUSTER QUEUE MONITOR                    
+AMQSCMX4    C           C SAMPLE CHANNEL EXIT                             
+AMQSCNXC    C           C SAMPLE CLIENT CONN USING MQCONNX                
+AMQSECH4    C           C SAMPLE REPLY TO QUEUE ECHO                      
+AMQSERV4    C           C SAMPLE TRIGGER SERVER                           
+AMQSEVTA    C           C SAMPLE FORMAT EVENTS                            
+AMQSFHAC    C           C SAMPLE RECONNECTABLE CONN                       
+AMQSGAMA    C           C SAMPLE RFH(1) PUBSUB SOCCER GAME PUBLISHER      
+AMQSGBR4    C           C SAMPLE BROWSE QUEUE USING (MQGET)               
+AMQSGET4    C           C SAMPLE GET MESSAGE USING (MQGET)                
+AMQSGHAC    C           C SAMPLE GET MSG RECONNECTABLE CONN               
+AMQSGRM4    C           C SAMPLE GET REFERENCE MESSAGE                    
+AMQSGR2A    C           C SAMPLE RFH2 PUBSUB SOCCER GAME PUBLISHER        
+AMQSINQ4    C           C SAMPLE USING (MQINQ)                            
+AMQSIQMA    C           C SAMPLE INQUIRE MESSAGE PROPERTY                 
+AMQSLOG0    C           C SAMPLE LOG EVENT MONITOR                        
+AMQSMHAC    C           C SAMPLE TRANSFER MSG RECONNECTABLE CONN          
+AMQSMON0    C           C SAMPLE DISPLAY STATISTICS/ACCOUNTING            
+AMQSPECA    C           C SAMPLE PCF END CHANNEL                          
+AMQSPHAC    C           C SAMPLE PUT MSG RECONNECTABLE CONN               
+AMQSPPCA    C           C SAMPLE PCF PUBLISH TO DEFAULT STREAM            
+AMQSPRM4    C           C SAMPLE PUT REFERENCE MESSAGE                    
+AMQSPR1A    C           C SAMPLE RFH(1) PUBLISH TO DEFAULT STREAM         
+AMQSPR2A    C           C SAMPLE RFH2 PUBLISH TO DEFAULT STREAM           
+AMQSPSE0    C           C SAMPLE PUBLISH EXIT                             
+AMQSPTL4    C           C SAMPLE PUT TO LIST OF QUEUES (MQPUT)            
+AMQSPUBA    C           C SAMPLE PUBLISH                                  
+AMQSPUT0    C           C SAMPLE PUT TO QUEUE (MQPUT)                     
+AMQSPUT4    C           C SAMPLE PUT TO QUEUE (MQPUT)                     
+AMQSQRM4    C           C SAMPLE PROCESS REFERENCE MESSAGES               
+AMQSREQ4    C           C SAMPLE USING REPLY QUEUE                        
+AMQSRESA    C           C SAMPLE RFH(1) PUBSUB SOCCER RESULTS             
+AMQSRR2A    C           C SAMPLE RFH2 PUBSUB SOCCER RESULTS               
+AMQSRUAA    C           C SAMPLE SUBSCRIBE RESOURCE USAGE                 
+AMQSSBXA    C           C SAMPLE EXTENDED SUBSCRIBE                       
+AMQSSET4    C           C SAMPLE USING (MQSET)                            
+AMQSSPCA    C           C SAMPLE PCF SUBSCRIBE TO DEFAULT STREAM          
+AMQSSR1A    C           C SAMPLE RFH(1) SUBSCRIBE TO DEFAULT STREAM       
+AMQSSR2A    C           C SAMPLE RFH2 SUBSCRIBE TO DEFAULT STREAM         
+AMQSSSLC    C           C SAMPLE SSLCLIENT USING MQCNO, MQSCO             
+AMQSSTMA    C           C SAMPLE SET MESSAGE PROPERTY                     
+AMQSSTOP    C           C SAMPLE STOP CONNECTIONS FOR PROCESS             
+AMQSSUBA    C           C SAMPLE SUBSCRIBE                                
+AMQSTRG4    C           C SAMPLE TRIGGER MONITOR                          
+AMQSVFC4    C           C SAMPLE SKELETON DATA-CONVERSION EXIT            
+AMQSWLM4    C           C SAMPLE CLUSTER WORKLOAD EXIT                    
+AMQSXRM4    C           C SAMPLE CHANNEL MESSAGE EXIT                     
