@@ -1,0 +1,96 @@
+ /* %Z% %W% %I% %E% %U% */
+ /********************************************************************/
+ /*                                                                  */
+ /* Program name: AMQSICL4                                           */
+ /*                                                                  */
+ /* Description: Sample CL program displaying channel names          */
+ /*              Can be run, with changes as needed, after           */
+ /*              starting the MQM                                    */
+ /*                                                                  */
+ /*   <copyright                                                     */
+ /*   notice="lm-source-program"                                     */
+ /*   pids="5724-H72,"                                               */
+ /*   years="2007,2012"                                              */
+ /*   crc="1106743658" >                                             */
+ /*   Licensed Materials - Property of IBM                           */
+ /*                                                                  */
+ /*   5724-H72,                                                      */
+ /*                                                                  */
+ /*   (C) Copyright IBM Corp. 2007, 2012 All Rights Reserved.        */
+ /*                                                                  */
+ /*   US Government Users Restricted Rights - Use, duplication or    */
+ /*   disclosure restricted by GSA ADP Schedule Contract with        */
+ /*   IBM Corp.                                                      */
+ /*   </copyright>                                                   */
+ /*                                                                  */
+ /********************************************************************/
+ /*                                                                  */
+ /* Function:                                                        */
+ /*                                                                  */
+ /*   AMQSICL4 is a sample CL program to display all channel names   */
+ /*   for a queue manager.                                           */
+ /*                                                                  */
+ /*   This program, or a similar one, can be run when the MQM        */
+ /*   is started.                                                    */
+ /*                                                                  */
+ /*   Exceptions signaled:  none                                     */
+ /*   Exceptions monitored: none                                     */
+ /*                                                                  */
+ /*   AMQSICL4 takes a single parameter, the Queue Manager name      */
+ /*                                                                  */
+ /********************************************************************/
+      QSYS/PGM PARM(&MQMNAME)
+
+        QSYS/DCL VAR(&MQMNAME) TYPE(*CHAR) LEN(48)
+        QSYS/DCL VAR(&CHLNAME) TYPE(*CHAR) LEN(20)
+        QSYS/DCL VAR(&CHLTYPE) TYPE(*CHAR) LEN(9)
+        QSYS/DCLF FILE(QTEMP/AMQSAICL) RCDFMT(*ALL) +
+                  ALWVARLEN(*NO) ALWNULL(*NO) +
+                  ALWGRAPHIC(*NO)
+
+ /********************************************************************/
+ /*   Create an empty physical file to receive the output            */
+ /********************************************************************/
+        QSYS/CRTPF FILE(QTEMP/AMQSAICL) RCDLEN(29)
+        QSYS/MONMSG  MSGID(CPF0000 MCH0000)
+        QSYS/CLRPFM FILE(QTEMP/AMQSAICL) MBR(*FIRST)
+        QSYS/MONMSG  MSGID(CPF0000 MCH0000)
+
+ /********************************************************************/
+ /*   Populate the file with data                                    */
+ /********************************************************************/
+        QSYS/CALL PGM(*LIBL/AMQSAICL) +
+        PARM(&MQMNAME 'QTEMP/AMQSAICL(AMQSAICL)')
+        QSYS/MONMSG  MSGID(CPF0000 MCH0000) EXEC(GOTO CMDLBL(ENDLOOP))
+
+ /********************************************************************/
+ /*   Loop for each channel listed in the physical file              */
+ /********************************************************************/
+      CHLLOOP:
+        QSYS/RCVF
+        QSYS/MONMSG MSGID(CPF0864) EXEC(GOTO CMDLBL(ENDLOOP))
+        QSYS/CHGVAR VAR(&CHLNAME) VALUE(%SST(&AMQSAICL 1 20))
+        QSYS/CHGVAR VAR(&CHLTYPE) VALUE(%SST(&AMQSAICL 21 9))
+
+ /********************************************************************/
+ /*   Display the channel name and ame Parameter                     */
+ /********************************************************************/
+        QSYS/SNDPGMMSG MSG(&CHLNAME *TCAT '(' *CAT &CHLTYPE *TCAT ')')
+
+        QSYS/GOTO CHLLOOP
+
+ /********************************************************************/
+ /*   End the program and perform cleanup                            */
+ /********************************************************************/
+      ENDLOOP:
+        QSYS/DLTF FILE(QTEMP/AMQSAICL)
+        QSYS/MONMSG  MSGID(CPF0000 MCH0000)
+      ENDPGM
+
+
+ /********************************************************************/
+ /*                                                                  */
+ /* END OF AMQSICL4                                                  */
+ /*                                                                  */
+ /********************************************************************/
+

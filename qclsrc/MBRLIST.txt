@@ -1,0 +1,3 @@
+Member      Type        Text                                              
+AMQSAMP4    CLLE        CL SAMPLE DEFINING SAMPLE OBJECTS                 
+AMQSICL4    CLLE        CL SAMPLE INQUIRING CHANNEL OBJECTS               

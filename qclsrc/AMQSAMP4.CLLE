@@ -1,1 +1,217 @@
+ /* sccsid %Z% %W% %I% %E% %U% */
+ /********************************************************************/
+ /*                                                                  */
+ /* Program name: AMQSAMP4                                           */
+ /*                                                                  */
+ /* Description: Sample CL program defining MQM queues               */
+ /*              to use with the sample programs                     */
+ /*              Can be run, with changes as needed, after           */
+ /*              starting the MQM                                    */
+ /*                                                                  */
+ /*   <copyright                                                     */
+ /*   notice="lm-source-program"                                     */
+ /*   pids="5724-H72,"                                               */
+ /*   years="1993,2012"                                              */
+ /*   crc="1820100773" >                                             */
+ /*   Licensed Materials - Property of IBM                           */
+ /*                                                                  */
+ /*   5724-H72,                                                      */
+ /*                                                                  */
+ /*   (C) Copyright IBM Corp. 1993, 2012 All Rights Reserved.        */
+ /*                                                                  */
+ /*   US Government Users Restricted Rights - Use, duplication or    */
+ /*   disclosure restricted by GSA ADP Schedule Contract with        */
+ /*   IBM Corp.                                                      */
+ /*   </copyright>                                                   */
+ /*                                                                  */
+ /********************************************************************/
+ /*                                                                  */
+ /* Function:                                                        */
+ /*                                                                  */
+ /*                                                                  */
+ /*   AMQSAMP4 is a sample CL program to create or reset the         */
+ /*   MQI resources to use with the sample programs.                 */
+ /*                                                                  */
+ /*   This program, or a similar one, can be run when the MQM        */
+ /*   is started - it creates the objects if missing, or resets      */
+ /*   their attributes to the prescribed values.                     */
+ /*                                                                  */
+ /*                                                                  */
+ /*                                                                  */
+ /*                                                                  */
+ /*   Exceptions signaled:  none                                     */
+ /*   Exceptions monitored: none                                     */
+ /*                                                                  */
+ /*   AMQSAMP4 takes a single parameter, the Queue Manager name      */
+ /*                                                                  */
+ /********************************************************************/
+             QSYS/PGM PARM(&QMGRNAME)
+
+ /********************************************************************/
+ /*   Queue Manager Name Parameter                                   */
+ /********************************************************************/
+             QSYS/DCL VAR(&QMGRNAME) TYPE(*CHAR)
+
+ /********************************************************************/
+ /*       EXAMPLES OF DIFFERENT QUEUE TYPES                          */
+ /*                                                                  */
+ /*   Create local, alias and remote queues                          */
+ /*                                                                  */
+ /*   Uses system defaults for most attributes                       */
+ /*                                                                  */
+ /********************************************************************/
+ /*   Create a local queue                                           */
+             CRTMQMQ     QNAME('SYSTEM.SAMPLE.LOCAL')                +
+                         MQMNAME(&QMGRNAME)                          +
+                         QTYPE(*LCL)  REPLACE(*YES)                  +
+                                                                     +
+                         TEXT('Sample local queue') /* description */+
+                         SHARE(*YES)                /* Shareable   */+
+                         DFTMSGPST(*YES)  /* Persistent messages OK  */
+
+ /*   Create an alias queue                                          */
+             CRTMQMQ     QNAME('SYSTEM.SAMPLE.ALIAS')                +
+                         MQMNAME(&QMGRNAME)                          +
+                         QTYPE(*ALS)  REPLACE(*YES)                  +
+                                                                     +
+                         TEXT('Sample alias queue')                  +
+                         DFTMSGPST(*YES) /* Persistent messages OK */+
+                         TGTQNAME('SYSTEM.SAMPLE.LOCAL')
+
+ /*   Create a remote queue - in this case, an indirect reference    */
+ /*      is made to the sample local queue on OTHER queue manager    */
+             CRTMQMQ     QNAME('SYSTEM.SAMPLE.REMOTE')               +
+                         MQMNAME(&QMGRNAME)                          +
+                         QTYPE(*RMT)  REPLACE(*YES)                  +
+                                                                     +
+                         TEXT('Sample remote queue')/* description */+
+                         DFTMSGPST(*YES) /* Persistent messages OK */+
+                         RMTQNAME('SYSTEM.SAMPLE.LOCAL')             +
+                         RMTMQMNAME(OTHER)   /* Queue is on OTHER    */
+
+ /*   Create a transmission queue for messages to queues at OTHER    */
+ /*   By default, use remote node name                               */
+             CRTMQMQ     QNAME('OTHER') /* transmission queue name */+
+                         MQMNAME(&QMGRNAME)                          +
+                         QTYPE(*LCL)  REPLACE(*YES)  +
+                         TEXT('Transmision queue to OTHER')  +
+                         USAGE(*TMQ)    /* transmission queue      */
+
+ /********************************************************************/
+ /*       SPECIFIC QUEUES AND PROCESS USED BY SAMPLE PROGRAMS        */
+ /*                                                                  */
+ /*   Create local queues used by sample programs                    */
+ /*   Create MQI process associated with sample initiation queue     */
+ /*                                                                  */
+ /********************************************************************/
+ /*   General reply queue                                            */
+             CRTMQMQ     QNAME('SYSTEM.SAMPLE.REPLY')                +
+                         MQMNAME(&QMGRNAME)                          +
+                         QTYPE(*LCL)  REPLACE(*YES)                  +
+                                                                     +
+                         TEXT('General reply queue')                 +
+                         DFTMSGPST(*NO) /* Not Persistent          */
+
+ /*   Queue used by AMQSINQ4                                        */
+             CRTMQMQ     QNAME('SYSTEM.SAMPLE.INQ')                  +
+                         MQMNAME(&QMGRNAME)                          +
+                         QTYPE(*LCL)  REPLACE(*YES)                  +
+                                                                     +
+                         TEXT('Queue for AMQSINQ4')                  +
+                         SHARE(*YES)                /* Shareable   */+
+                         DFTMSGPST(*NO) /* Not Persistent          */+
+                                                                     +
+                         TRGENBL(*YES)  /* Trigger control on      */+
+                         TRGTYPE(*FIRST)/* Trigger on first message*/+
+                         PRCNAME('SYSTEM.SAMPLE.INQPROCESS')         +
+                         INITQNAME('SYSTEM.SAMPLE.TRIGGER')
+
+ /*   Queue used by AMQSSET4                                        */
+             CRTMQMQ     QNAME('SYSTEM.SAMPLE.SET')                  +
+                         MQMNAME(&QMGRNAME)                          +
+                         QTYPE(*LCL)  REPLACE(*YES)                  +
+                                                                     +
+                         TEXT('Queue for AMQSSET4')                  +
+                         SHARE(*YES)                /* Shareable  */ +
+                         DFTMSGPST(*NO)/* Not Persistent          */ +
+                                                                     +
+                         TRGENBL(*YES)  /* Trigger control on     */ +
+                         TRGTYPE(*FIRST)/* Trigger on first message*/+
+                         PRCNAME('SYSTEM.SAMPLE.SETPROCESS')         +
+                         INITQNAME('SYSTEM.SAMPLE.TRIGGER')
+
+ /*   Queue used by AMQSECH4                                         */
+             CRTMQMQ     QNAME('SYSTEM.SAMPLE.ECHO')                 +
+                         MQMNAME(&QMGRNAME)                          +
+                         QTYPE(*LCL)  REPLACE(*YES)                  +
+                                                                     +
+                         TEXT('Queue for AMQSECH4')                  +
+                         SHARE(*YES)                /* Shareable  */ +
+                         DFTMSGPST(*NO)/* Not Persistent          */ +
+                                                                     +
+                         TRGENBL(*YES)  /* Trigger control on     */ +
+                         TRGTYPE(*FIRST)/* Trigger on first message*/+
+                         PRCNAME('SYSTEM.SAMPLE.ECHOPROCESS')        +
+                         INITQNAME('SYSTEM.SAMPLE.TRIGGER')
+
+ /*   Initiation Queue used by AMQSTRG4, sample trigger process     */
+             CRTMQMQ     QNAME('SYSTEM.SAMPLE.TRIGGER') +
+                         MQMNAME(&QMGRNAME)                          +
+                         QTYPE(*LCL)  REPLACE(*YES)   +
+                         TEXT('Trigger queue for sample programs')
+
+ /*   MQI Processes associated with triggered sample programs       */
+ /*                                                                 */
+ /*****    Note - there are versions of the triggered samples  ******/
+ /*****      in different languages - set APPID for these      ******/
+ /*****      process to the variation you want to trigger      ******/
+ /*                                                                 */
+             CRTMQMPRC   PRCNAME('SYSTEM.SAMPLE.INQPROCESS')         +
+                         MQMNAME(&QMGRNAME)                          +
+                         REPLACE(*YES)                               +
+                                                                     +
+                         TEXT('Trigger process for AMQSINQ4')        +
+                         ENVDATA('JOBPTY(3)') /* Submit parameter */ +
+/** Select the triggered program here             **/                +
+                         APPID('QMQM/AMQSINQ4')    /* C              +
+                /*       APPID('QMQM/AMQ0INQ4')    /* COBOL */       +
+                /*       APPID('QMQM/AMQ3INQ4')    /* RPG - ILE */
+
+             CRTMQMPRC   PRCNAME('SYSTEM.SAMPLE.SETPROCESS')         +
+                         MQMNAME(&QMGRNAME)                          +
+                         REPLACE(*YES)                               +
+                                                                     +
+                         TEXT('Trigger process for AMQSSET4')        +
+                         ENVDATA('JOBPTY(3)') /* Submit parameter */ +
+/** Select the triggered program here             **/                +
+                         APPID('QMQM/AMQSSET4')    /* C     */       +
+                /*       APPID('QMQM/AMQ0SET4')    /* COBOL */       +
+                /*       APPID('QMQM/AMQ3SET4')    /* RPG - ILE */
+
+             CRTMQMPRC   PRCNAME('SYSTEM.SAMPLE.ECHOPROCESS')        +
+                         MQMNAME(&QMGRNAME)                          +
+                         REPLACE(*YES)                               +
+                                                                     +
+                         TEXT('Trigger process for AMQSECH4')        +
+                         ENVDATA('JOBPTY(3)') /* Submit parameter */ +
+/** Select the triggered program here             **/                +
+                         APPID('QMQM/AMQSECH4')    /* C     */       +
+                /*       APPID('QMQM/AMQ0ECH4')    /* COBOL */       +
+                /*       APPID('QMQM/AMQ3ECH4')    /* RPG - ILE */
+
+ /********************************************************************/
+ /*                                                                  */
+ /*   Normal return.                                                 */
+ /*                                                                  */
+ /********************************************************************/
+             SNDPGMMSG   MSG('AMQSAMP4 Completed creating sample +
+                         objects for ' *CAT &QMGRNAME)
+             RETURN
+             ENDPGM
+
+ /********************************************************************/
+ /*                                                                  */
+ /* END OF AMQSAMP4                                                  */
+ /*                                                                  */
+ /********************************************************************/
 
