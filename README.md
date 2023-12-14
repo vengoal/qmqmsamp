@@ -9,3 +9,6 @@ https://github.com/vengoal/qmqmsamp/blob/main/qcbllesrc/MBRLIST.txt
 
 ## qcsrc C samples description
 https://github.com/vengoal/qmqmsamp/blob/main/qcsrc/MBRLIST.txt
+
+## qclsrc CL samples description
+https://github.com/vengoal/qmqmsamp/blob/main/qclsrc/MBRLIST.txt
