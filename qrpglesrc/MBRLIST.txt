@@ -1,0 +1,15 @@
+Member      Type        Text                                             
+AMQ3CBF4    RPGLE       ILE/RPG SAMPLE CALLBACK FUNCTION                 
+AMQ3ECH4    RPGLE       ILE/RPG SAMPLE ECHO PROGRAM                      
+AMQ3GBR4    RPGLE       ILE/RPG SAMPLE BROWSE QUEUE USING (MQGET)        
+AMQ3GET4    RPGLE       ILE/RPG SAMPLE GET MESSAGE USING (MQGET)         
+AMQ3INQ4    RPGLE       ILE/RPG SAMPLE USING (MQINQ)                     
+AMQ3IQM4    RPGLE       ILE/RPG SAMPLE USING (MQINQMP)                   
+AMQ3PUB4    RPGLE       ILE/RPG SAMPLE USING (MQPUT)                     
+AMQ3PUT4    RPGLE       ILE/RPG SAMPLE PUT TO QUEUE (MQPUT)              
+AMQ3REQ4    RPGLE       ILE/RPG SAMPLE USING REPLY QUEUE                  
+AMQ3SET4    RPGLE       ILE/RPG SAMPLE USING (MQSET)                      
+AMQ3SRV4    RPGLE       ILE/RPG SAMPLE TRIGGER SERVER                     
+AMQ3STM4    RPGLE       ILE/RPG SAMPLE USIGN (MQSETMP)                    
+AMQ3SUB4    RPGLE       ILE/RPG SAMPLE USING (MQSUB)                      
+AMQ3TRG4    RPGLE       ILE/RPG SAMPLE TRIGGER MONITOR                    
