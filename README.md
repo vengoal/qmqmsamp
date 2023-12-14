@@ -27,7 +27,9 @@ Make sure that the library containing the copy files (QMQM) is in the library li
 ## qcsrc C samples description
 https://github.com/vengoal/qmqmsamp/blob/main/qcsrc/MBRLIST.txt
 <ul>
+  <li>The C include files containing the named constants and structure definitions for use with the MQI are contained in the source physical file QMQM/H.</li>
   <li><a href="https://www.ibm.com/docs/en/ibm-mq/9.3?topic=i-preparing-c-programs-in">Preparing C programs in IBM i</a></li>
+  <li>CRTCMOD and CRTPGM BNDSRVPGM(QMQM/LIBMQM)</li>
 </ul>
 
 ## qclsrc CL samples description
