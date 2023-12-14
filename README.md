@@ -15,6 +15,7 @@ Make sure that the library containing the copy files (QMQM) is in the library li
 ## qcbllesrc ILE COBOL samples description
 https://github.com/vengoal/qmqmsamp/blob/main/qcbllesrc/MBRLIST.txt
 <ul>
+  <li>The COBOL copy files containing the named constants and structure definitions for use with the MQI are contained in the source physical file QMQM/QCBLLESRC.</li>
   <li><a href="https://www.ibm.com/docs/en/ibm-mq/9.3?topic=i-preparing-cobol-programs-in">Preparing COBOL programs in IBM i</a></li>
 </ul>
 
