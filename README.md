@@ -17,7 +17,7 @@ https://github.com/vengoal/qmqmsamp/blob/main/qcbllesrc/MBRLIST.txt
 <ul>
   <li>The COBOL copy files containing the named constants and structure definitions for use with the MQI are contained in the source physical file QMQM/QCBLLESRC.</li>
   <li><a href="https://www.ibm.com/docs/en/ibm-mq/9.3?topic=i-preparing-cobol-programs-in">Preparing COBOL programs in IBM i</a>
-  To do this for ILE RPG/400, you can use the typical IBM i commands, CRTCBLMOD and CRTPGM.
+  To do this for ILE COBOL, you can use the typical IBM i commands, CRTCBLMOD and CRTPGM.
     
   After creating your *MODULE, you need to specify BNDSRVPGM(QMQM/AMQ0STUB) in the CRTPGM command. This includes the various IBM MQ procedures in your program.
 
