@@ -1,0 +1,400 @@
+       IDENTIFICATION DIVISION.
+      ****************************************************************
+      *                                                              *
+      * Program name: AMQ0SET4                                       *
+      *                                                              *
+      * Description: Sample COBOL program using MQSET                *
+      *                                                              *
+      *   <copyright                                                 *
+      *   notice="lm-source-program"                                 *
+      *   pids="5724-H72,"                                           *
+      *   years="1993,2012"                                          *
+      *   crc="1231102522" >                                         *
+      *   Licensed Materials - Property of IBM                       *
+      *                                                              *
+      *   5724-H72,                                                  *
+      *                                                              *
+      *   (C) Copyright IBM Corp. 1993, 2012 All Rights Reserved.    *
+      *                                                              *
+      *   US Government Users Restricted Rights - Use, duplication or  *
+      *   disclosure restricted by GSA ADP Schedule Contract with    *
+      *   IBM Corp.                                                  *
+      *   </copyright>                                               *
+      *                                                              *
+      ****************************************************************
+      *                                                              *
+      * Function:                                                    *
+      *                                                              *
+      *                                                              *
+      *   AMQ0SET4 is a sample COBOL program that inhibits PUTs      *
+      *   to a message queue, an example of MQSET.   It is           *
+      *   intended to run as a triggered program, and so receives    *
+      *   input in a trigger parameter.                              *
+      *                                                              *
+      *   Note: one way to run AMQ0SET4 is to be running AMQSERV4    *
+      *         trigger server, and to use AMQ0REQ4 to send          *
+      *         request messages (containing queue names) to a       *
+      *         queue (eg SYSTEM.SAMPLE.SET) which must have been    *
+      *         defined to trigger AMQ0SET4.                         *
+      *                                                              *
+      *      -- gets request messages from a queue whose name is     *
+      *         in the trigger parameter; the content of each        *
+      *         message is the name of a message queue               *
+      *                                                              *
+      *      -- inhibits PUTs to the queue named in the request,     *
+      *         and sends a message to the named reply queue to      *
+      *         confirm it was done                                  *
+      *                                                              *
+      *         alternatively, sends a report message if the         *
+      *         queue can't  be inhibited - eg, if the queue         *
+      *         to be inhibited does not exist                       *
+      *                                                              *
+      *      -- stops when the input queue becomes empty             *
+      *                                                              *
+      *      -- writes a message for each MQI reason other than      *
+      *         MQRC-NONE; stops if there is a MQI completion code   *
+      *         of MQCC-FAILED                                       *
+      *                                                              *
+      *    Program logic:                                            *
+      *         MQCONNect to default queue manager                   *
+      *         MQOPEN message queue (A) for shared input            *
+      *         while no MQI failures,                               *
+      *         .  MQGET next message from queue A                   *
+      *         .  if message is a request,                          *
+      *         .  .  MQOPEN queue (B) named in request for SET      *
+      *         .  .  Use MQSET, inhibit PUTs to queue B             *
+      *         .  .  Prepare reply message if PUT was inhibited     *
+      *         .  .  MQCLOSE queue B                                *
+      *         .  .  Prepare report message if reply not available  *
+      *         .  .  MQPUT1, send reply or report to reply queue    *
+      *         MQCLOSE queue A                                      *
+      *         MQDISConnect from queue manager                      *
+      *                                                              *
+      *                                                              *
+      ****************************************************************
+      *                                                              *
+      *                                                              *
+      *                                                              *
+      *   Exceptions signaled:  none                                 *
+      *   Exceptions monitored: none                                 *
+      *                                                              *
+      *   AMQ0SET4 has 1 parameter - a string based on the           *
+      *       initiation trigger message; only the QNmame            *
+      *       field is used in this example                          *
+      *                                                              *
+      ****************************************************************
+       PROGRAM-ID. AMQ0SET4.
+
+      ****************************************************************
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+      *
+      **  Declare MQI structures needed
+      * MQI named constants
+       01 MY-MQ-CONSTANTS.
+          COPY CMQV.
+      * Object Descriptor
+       01 OBJECT-DESCRIPTOR.
+          COPY CMQODV.
+      * Message Descriptor
+       01 MESSAGE-DESCRIPTOR.
+          COPY CMQMDV.
+      * Get message options
+       01 GMOPTIONS.
+          COPY CMQGMOV.
+      * Put message options
+       01 PMOPTIONS.
+          COPY CMQPMOV.
+      ** note, sample uses defaults where it can
+       01 QM-NAME                    PIC X(48) VALUE SPACES.
+       01 HCONN                      PIC S9(9) BINARY.
+       01 Q-HANDLE                   PIC S9(9) BINARY.
+       01 SET-HANDLE                 PIC S9(9) BINARY.
+       01 OPTIONS                    PIC S9(9) BINARY.
+       01 COMPLETION-CODE            PIC S9(9) BINARY.
+       01 OPEN-CODE                  PIC S9(9) BINARY.
+       01 CON-REASON                 PIC S9(9) BINARY.
+       01 REASON                     PIC S9(9) BINARY.
+       01 BUFFER-LENGTH              PIC S9(9) BINARY.
+       01 DATA-LENGTH                PIC S9(9) BINARY.
+       01 SELECT-COUNT               PIC S9(9) BINARY VALUE 1.
+       01 SELECTOR-TABLE.
+         02 SELECTOR                 PIC S9(9) BINARY OCCURS 1 TIMES.
+       01 INT-ATTR-COUNT             PIC S9(9) BINARY VALUE 1.
+       01 INT-ATTR-TABLE.
+         02 INT-ATTR                 PIC S9(9) BINARY OCCURS 1 TIMES.
+       01 CHAR-ATTR-LENGTH           PIC S9(9) BINARY VALUE 0.
+       01 CHAR-ATTRS                 PIC X(100).
+
+      ** message is read into buffer; reply contains an extension
+       01 REPLY.
+         02 BUFFER                   PIC X(48).
+         02 BUF1                     PIC X(14) VALUE " PUT inhibited".
+
+       LINKAGE SECTION.
+       01 TRIGGER-DATA.
+          COPY CMQTMCL.
+
+      ****************************************************************
+       PROCEDURE DIVISION USING TRIGGER-DATA.
+       P0.
+      ** indicate that sample program has started
+           DISPLAY "AMQ0SET4 start".
+
+      ****************************************************************
+      *                                                              *
+      *   This sample includes an explicit connect (MQCONN)          *
+      *                                                              *
+      ****************************************************************
+           CALL "MQCONN"
+            USING QM-NAME, HCONN,
+            COMPLETION-CODE, CON-REASON.
+
+      *      report reason and stop if it failed
+           IF COMPLETION-CODE IS EQUAL TO MQCC-FAILED
+             DISPLAY "MQCONN ended with reason code " CON-REASON
+             STOP RUN
+             END-IF.
+      *
+      ****************************************************************
+      *                                                              *
+      *   Open the message queue for shared input                    *
+      *                                                              *
+      ****************************************************************
+       OPENS.
+           MOVE MQTMC-QNAME TO MQOD-OBJECTNAME.
+           ADD MQOO-INPUT-SHARED MQOO-FAIL-IF-QUIESCING
+                     GIVING OPTIONS.
+           CALL "MQOPEN"
+            USING HCONN, OBJECT-DESCRIPTOR,
+            OPTIONS, Q-HANDLE,
+            OPEN-CODE, REASON.
+
+      *      report reason, if any; stop if failed
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             DISPLAY "MQOPEN (input) ended with reason code " REASON
+             END-IF.
+
+           IF OPEN-CODE IS EQUAL TO MQCC-FAILED
+             DISPLAY "unable to open queue for input"
+             STOP RUN
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *   Get messages from the message queue                        *
+      *                                                              *
+      ****************************************************************
+       GETS.
+           MOVE OPEN-CODE TO COMPLETION-CODE.
+           PERFORM GETR THRU RESPR WITH TEST BEFORE
+             UNTIL COMPLETION-CODE IS EQUAL TO MQCC-FAILED.
+
+      ****************************************************************
+      *                                                              *
+      *   Close the source queue                                     *
+      *                                                              *
+      ****************************************************************
+       CLOSES.
+           MOVE MQCO-NONE TO OPTIONS.
+           CALL "MQCLOSE"
+            USING HCONN, Q-HANDLE, OPTIONS,
+            COMPLETION-CODE, REASON.
+
+      *      report reason, if any
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             DISPLAY "MQCLOSE ended with reason code " REASON
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *   Disconnect from MQM (if not previously connected)          *
+      *                                                              *
+      ****************************************************************
+       DISCS.
+           IF CON-REASON IS NOT EQUAL TO MQRC-ALREADY-CONNECTED
+             CALL "MQDISC"
+              USING HCONN, COMPLETION-CODE, REASON
+
+      *      report reason, if any
+             IF REASON IS NOT EQUAL TO MQRC-NONE
+               DISPLAY "MQDISC ended with reason code " REASON
+             END-IF
+           END-IF.
+
+       OVER.
+      ** indicate that sample program has finished
+           DISPLAY "AMQ0SET4 end".
+           STOP RUN.
+
+      ****************************************************************
+      *                                                              *
+      *   Get one message (request)                                  *
+      *                                                              *
+      ****************************************************************
+       GETR.
+           MOVE SPACES TO BUFFER.
+           ADD MQGMO-ACCEPT-TRUNCATED-MSG MQGMO-WAIT
+                GIVING MQGMO-OPTIONS.
+           MOVE 5000 TO MQGMO-WAITINTERVAL.
+           MOVE 48 to BUFFER-LENGTH.
+      **  clear selectors to get messages in sequence
+           MOVE MQMI-NONE TO MQMD-MSGID.
+           MOVE MQCI-NONE TO MQMD-CORRELID.
+
+           CALL "MQGET"
+            USING HCONN, Q-HANDLE,
+            MESSAGE-DESCRIPTOR, GMOPTIONS,
+            BUFFER-LENGTH, BUFFER, DATA-LENGTH,
+            COMPLETION-CODE, REASON.
+
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             IF REASON IS EQUAL TO MQRC-NO-MSG-AVAILABLE
+               DISPLAY "no more messages"
+             ELSE
+               DISPLAY "MQGET ended with reason code " REASON
+             END-IF
+           END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *   Display message received                                   *
+      *                                                              *
+      ****************************************************************
+       DISPM.
+           IF COMPLETION-CODE IS NOT EQUAL TO MQCC-FAILED
+             DISPLAY "message is <" BUFFER ">"
+           END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *  Respond to requests only                                    *
+      *                                                              *
+      ****************************************************************
+       RESPR.
+           IF COMPLETION-CODE IS EQUAL TO MQCC-OK
+             IF MQMD-MSGTYPE IS NOT EQUAL TO MQMT-REQUEST
+               DISPLAY "  -- not a request and discarded"
+             ELSE
+               PERFORM RESP1 THRU RESP3
+             END-IF
+           END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *  Process a request message                                   *
+      *                                                              *
+      ****************************************************************
+       RESP1.
+           MOVE BUFFER TO MQOD-OBJECTNAME.
+           PERFORM SOPEN.
+           IF COMPLETION-CODE IS EQUAL TO MQCC-OK
+             PERFORM SETS THRU SCLOSE
+           END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *  Create report if not a reply                                *
+      *                                                              *
+      ****************************************************************
+       RESP2.
+      ** in this sample, the same message data is sent in the report
+           IF MQMD-MSGTYPE IS EQUAL TO MQMT-REPORT
+             MOVE 48 TO BUFFER-LENGTH.
+
+      ****************************************************************
+      *                                                              *
+      *  Send the reply or report message                            *
+      *                                                              *
+      ****************************************************************
+       RESP3.
+      ** stop further reports
+           MOVE MQRO-NONE TO MQMD-REPORT.
+      ** copy reply queue names
+           MOVE MQMD-REPLYTOQ TO MQOD-OBJECTNAME.
+           MOVE MQMD-REPLYTOQMGR TO MQOD-OBJECTQMGRNAME.
+      ** use message ID of request as the Correlation ID
+           MOVE MQMD-MSGID TO MQMD-CORRELID.
+      ** put single message, reply or report
+           CALL "MQPUT1"
+            USING HCONN, OBJECT-DESCRIPTOR,
+            MESSAGE-DESCRIPTOR, PMOPTIONS,
+            BUFFER-LENGTH, REPLY,
+            COMPLETION-CODE, REASON.
+
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             DISPLAY "MQPUT1 ended with reason code " REASON
+             END-IF.
+
+      ** Note - this sample stops if MQPUT1 fails; in some
+      **        applications it may be appropriate to
+      **        continue after selected REASON codes
+
+      ****************************************************************
+      *                                                              *
+      *  Open subject queue for SET                                  *
+      *                                                              *
+      ****************************************************************
+       SOPEN.
+           ADD MQOO-SET MQOO-FAIL-IF-QUIESCING
+                     GIVING OPTIONS.
+           CALL "MQOPEN"
+            USING HCONN, OBJECT-DESCRIPTOR,
+            OPTIONS, SET-HANDLE,
+            COMPLETION-CODE, REASON.
+
+           IF OPEN-CODE IS EQUAL TO MQCC-FAILED
+             MOVE MQMT-REPORT to MQMD-MSGTYPE
+             MOVE REASON TO MQMD-FEEDBACK
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *  Inhibits PUTs to the queue (MQSET)                          *
+      *                                                              *
+      ****************************************************************
+       SETS.
+           MOVE MQIA-INHIBIT-PUT TO SELECTOR(1).
+           MOVE MQQA-PUT-INHIBITED TO INT-ATTR(1).
+           CALL "MQSET"
+            USING HCONN, SET-HANDLE,
+            SELECT-COUNT, SELECTOR-TABLE,
+            INT-ATTR-COUNT, INT-ATTR-TABLE,
+            CHAR-ATTR-LENGTH, CHAR-ATTRS,
+            COMPLETION-CODE, REASON.
+
+      ****************************************************************
+      *                                                              *
+      *  Prepare reply message if Inhibit (MQSET) worked             *
+      *                                                              *
+      ****************************************************************
+       SREPLY.
+           IF COMPLETION-CODE IS EQUAL TO MQCC-OK
+             MOVE 62 TO BUFFER-LENGTH
+             MOVE MQMT-REPLY TO MQMD-MSGTYPE
+           ELSE
+             MOVE MQMT-REPORT TO MQMD-MSGTYPE
+             MOVE REASON TO MQMD-FEEDBACK
+           END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *  CLOSE the MQSET queue                                       *
+      *                                                              *
+      ****************************************************************
+       SCLOSE.
+           MOVE MQCO-NONE TO OPTIONS.
+           CALL "MQCLOSE"
+            USING HCONN, SET-HANDLE, OPTIONS,
+            COMPLETION-CODE, REASON.
+
+      *      report reason, if any
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             DISPLAY "MQCLOSE ended with reason code " REASON
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      * END OF AMQ0SET4                                              *
+      *                                                              *
+      ****************************************************************

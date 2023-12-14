@@ -1,0 +1,303 @@
+       IDENTIFICATION DIVISION.
+      ****************************************************************
+      *                                                              *
+      * Program name: AMQ0SUB4                                       *
+      *                                                              *
+      * Description: Sample COBOL program that subscribes and gets   *
+      *              messages from a topic (example using MQSUB)     *
+      *              A managed destination is used                   *
+      *   <copyright                                                 *
+      *   notice="lm-source-program"                                 *
+      *   pids="5724-H72,"                                           *
+      *   years="2008,2012"                                          *
+      *   crc="2962285967" >                                         *
+      *   Licensed Materials - Property of IBM                       *
+      *                                                              *
+      *   5724-H72,                                                  *
+      *                                                              *
+      *   (C) Copyright IBM Corp. 2008, 2012 All Rights Reserved.    *
+      *                                                              *
+      *   US Government Users Restricted Rights - Use, duplication or  *
+      *   disclosure restricted by GSA ADP Schedule Contract with    *
+      *   IBM Corp.                                                  *
+      *   </copyright>                                               *
+      *                                                              *
+      ****************************************************************
+      *                                                              *
+      * Function:                                                    *
+      *                                                              *
+      *                                                              *
+      *   AMQ0SUB4 is a sample COBOL program to subscribe to a       *
+      *   topic and get messages from the managed destination        *
+      *   queueand                                                   *
+      *                                                              *
+      *      -- subscribe non-durably to the topic named in the      *
+      *         program parameter                                    *
+      *                                                              *
+      *      -- calls MQGET repeatedly to get messages from the      *
+      *         managed destination queue and displays the message   *
+      *                                                              *
+      *      -- writes a message for each MQI reason other than      *
+      *         MQRC-NONE; stops if there is a MQI completion        *
+      *         code of MQCC-FAILED                                  *
+      *                                                              *
+      *    Program logic:                                            *
+      *         MQSUB topic for input                                *
+      *         while no MQI failures,                               *
+      *         .  MQGET next message                                *
+      *         .  print the result                                  *
+      *         MQCLOSE the topic                                    *
+      *                                                              *
+      *                                                              *
+      ****************************************************************
+      *                                                              *
+      *                                                              *
+      *                                                              *
+      *   Exceptions signaled:  none                                 *
+      *   Exceptions monitored: none                                 *
+      *                                                              *
+      *   AMQ0SUB4 has 2 parameters - (1) name of the target topic   *
+      *                               (2) name of the queue manager  *
+      *                                                              *
+      ****************************************************************
+       PROGRAM-ID. 'AMQ0SUB4'.
+
+      ****************************************************************
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+      *
+      **  Declare MQI structures needed
+      * MQI named constants
+       01 MY-MQ-CONSTANTS.
+          COPY CMQV.
+      * Object Descriptor
+       01 SUB-DESCRIPTOR.
+          COPY CMQSDV.
+      * Message Descriptor
+       01 MESSAGE-DESCRIPTOR.
+          COPY CMQMDV.
+      * Put message options
+       01 PMOPTIONS.
+          COPY CMQPMOV.
+      * GMO Options
+       01 GMOOPTIONS.
+          COPY CMQGMOV.
+
+      ** note, sample uses defaults where it can
+       01 HCONN                      PIC S9(9) BINARY.
+       01 Q-HANDLE                   PIC S9(9) BINARY.
+       01 SUB-HANDLE                 PIC S9(9) BINARY.
+       01 OPTIONS                    PIC S9(9) BINARY.
+       01 COMPLETION-CODE            PIC S9(9) BINARY.
+       01 S-COMP-CODE                PIC S9(9) BINARY.
+       01 CON-REASON                 PIC S9(9) BINARY.
+       01 REASON                     PIC S9(9) BINARY.
+       01 BUFFER                     PIC X(101).
+       01 BUFFER-LENGTH              PIC S9(9) BINARY.
+       01 MESS-LEN                   PIC S9(9) BINARY.
+       01 TOPIC-LENGTH               PIC S9(9) BINARY VALUE 0.
+       01 REAL-TOPIC-LENGTH          PIC S9(9) BINARY VALUE 0.
+       01 WORK-FIELD                 PIC X(60).
+       LINKAGE SECTION.
+       01 TARGET-TOPIC               PIC X(48).
+       01 QUEUE-MANAGER              PIC X(48).
+
+      ****************************************************************
+       PROCEDURE DIVISION USING TARGET-TOPIC, QUEUE-MANAGER.
+       P0.
+      ** indicate that sample program has started
+           DISPLAY 'AMQ0SUB4 start'.
+
+      ****************************************************************
+      *                                                              *
+      *    use parameters as the name of the target topic            *
+      *                              and the queue manager           *
+      *                                                              *
+      ****************************************************************
+           DISPLAY "target topic is " TARGET-TOPIC.
+           DISPLAY "queue manager is " QUEUE-MANAGER.
+
+      ****************************************************************
+      *                                                              *
+      *   Connect to queue manager                                   *
+      *                                                              *
+      ****************************************************************
+           CALL 'MQCONN'
+            USING QUEUE-MANAGER, HCONN,
+            COMPLETION-CODE, CON-REASON.
+
+      *      report reason and stop if it failed
+           IF COMPLETION-CODE IS EQUAL TO MQCC-FAILED
+             DISPLAY 'MQCONN ended with reason code ' CON-REASON
+             MOVE CON-REASON TO RETURN-CODE
+             GOBACK
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *   Subscribe to the target topic (and fail if MQM is          *
+      *   quiescing)                                                 *
+      *                                                              *
+      ****************************************************************
+       SUBSCRIBE.
+      *     Work out how many trailing spaces we have to determine
+      *     real length of TOPIC STRING. Need to reverse the string
+      *     as there is no TRAILING keyword in some COBOL
+      *     implementations.
+           MOVE FUNCTION REVERSE (TARGET-TOPIC) TO WORK-FIELD.
+           INSPECT WORK-FIELD TALLYING TOPIC-LENGTH
+               FOR LEADING SPACES.
+           SUBTRACT TOPIC-LENGTH FROM LENGTH OF TARGET-TOPIC
+               GIVING REAL-TOPIC-LENGTH.
+           MOVE REAL-TOPIC-LENGTH TO MQSD-OBJECTSTRING-VSLENGTH.
+           SET MQSD-OBJECTSTRING-VSPTR TO ADDRESS OF TARGET-TOPIC.
+
+
+           ADD MQSO-CREATE MQSO-NON-DURABLE MQSO-FAIL-IF-QUIESCING
+               MQSO-MANAGED GIVING MQSD-OPTIONS.
+           CALL 'MQSUB'
+            USING HCONN, SUB-DESCRIPTOR,
+            Q-HANDLE, SUB-HANDLE,
+            S-COMP-CODE, REASON.
+
+      *      report reason, if any; stop if failed
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             DISPLAY 'MQOPEN ended with reason code ' REASON
+             END-IF.
+
+           IF S-COMP-CODE IS EQUAL TO MQCC-FAILED
+             DISPLAY 'unable to subscribe to topic'
+             MOVE REASON TO RETURN-CODE
+             GOBACK
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *   Get messages from the managed destination queue            *
+      *                                                              *
+      ****************************************************************
+       GETS.
+           ADD MQGMO-WAIT MQGMO-NO-SYNCPOINT MQGMO-CONVERT
+               GIVING MQGMO-OPTIONS.
+           MOVE 30000 to MQGMO-WAITINTERVAL.
+
+           MOVE S-COMP-CODE TO COMPLETION-CODE.
+           PERFORM GET-SUB WITH TEST BEFORE
+             UNTIL COMPLETION-CODE IS EQUAL TO MQCC-FAILED.
+
+      ****************************************************************
+      *                                                              *
+      *   Close the subscription handle                              *
+      *                                                              *
+      ****************************************************************
+       CLOSES.
+           IF S-COMP-CODE IS NOT EQUAL TO MQCC-FAILED
+               MOVE MQCO-NONE TO OPTIONS
+               CALL 'MQCLOSE'
+                USING HCONN, SUB-HANDLE, OPTIONS,
+                COMPLETION-CODE, REASON
+
+      *          report reason, if any
+               IF REASON IS NOT EQUAL TO MQRC-NONE
+                 DISPLAY 'MQCLOSE ended with reason code ' REASON
+               END-IF
+            END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *   Close the managed destination queue (if it was opened)     *
+      *                                                              *
+      ****************************************************************
+           IF S-COMP-CODE IS NOT EQUAL TO MQCC-FAILED
+               MOVE MQCO-NONE TO OPTIONS
+               CALL 'MQCLOSE'
+                USING HCONN, Q-HANDLE, OPTIONS,
+                COMPLETION-CODE, REASON
+
+      *          report reason, if any
+               IF REASON IS NOT EQUAL TO MQRC-NONE
+                 DISPLAY 'MQCLOSE ended with reason code ' REASON
+               END-IF
+             END-IF.
+
+
+
+      ****************************************************************
+      *                                                              *
+      *  Disconnect from queue manager (if not previously connected) *
+      *                                                              *
+      ****************************************************************
+       DISCS.
+           IF CON-REASON IS NOT EQUAL TO MQRC-ALREADY-CONNECTED
+             CALL 'MQDISC'
+              USING HCONN, COMPLETION-CODE, REASON
+
+      *      report reason, if any
+             IF REASON IS NOT EQUAL TO MQRC-NONE
+               DISPLAY 'MQDISC ended with reason code ' REASON
+             END-IF
+           END-IF.
+
+       OVER.
+      ** indicate that sample program has finished
+           DISPLAY 'Sample AMQ0SUB4 end'.
+           MOVE ZERO TO RETURN-CODE.
+           GOBACK.
+
+      ****************************************************************
+      *                                                              *
+      *   Get one message from the managed destination queue         *
+      *                                                              *
+      ****************************************************************
+       GET-SUB.
+
+      *       MQGET sets Encoding and CodedCharSet to values in the
+      *       message returned, so these fields should be reset to
+      *       the default values before every call, as MQGMO-CONVERT
+      *       is specified
+           MOVE MQENC-NATIVE TO MQMD-ENCODING.
+           MOVE MQCCSI-Q-MGR TO MQMD-CODEDCHARSETID.
+
+      *      In order to read the messages in sequence, MsgId and
+      *      CorrelId must have the default value. MQGET sets them
+      *      to the values in for message it returns, so re-iniialise
+      *      them before every call
+           MOVE MQMI-NONE TO MQMD-MSGID.
+           MOVE MQCI-NONE TO MQMD-CORRELID.
+
+           MOVE 100 TO BUFFER-LENGTH.
+
+           DISPLAY 'Calling MQGET : 30 seconds wait time'.
+
+           CALL 'MQGET'
+            USING HCONN, Q-HANDLE,
+            MESSAGE-DESCRIPTOR, GMOOPTIONS,
+            BUFFER-LENGTH, BUFFER, MESS-LEN,
+            COMPLETION-CODE, REASON.
+
+      *      report reason, if any
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+               IF REASON IS EQUAL TO MQRC-NO-MSG-AVAILABLE
+                  DISPLAY 'No more messages available.'
+               ELSE
+                  DISPLAY 'MQGET ended with reason code ' REASON
+      *               treat truncated message as failure for this sample
+                  IF REASON IS EQUAL TO MQRC-TRUNCATED-MSG-FAILED
+                     MOVE MQCC-FAILED TO COMPLETION-CODE
+                     DISPLAY 'BUFFER LENGTH : ' BUFFER-LENGTH
+                     DISPLAY 'MESSAGE LENGTH :' MESS-LEN
+                     END-IF
+               END-IF
+           END-IF.
+
+      *       display each message received
+           IF COMPLETION-CODE IS NOT EQUAL TO MQCC-FAILED
+               DISPLAY 'message <' BUFFER
+           END-IF.
+
+
+      ****************************************************************
+      *                                                              *
+      * END OF AMQ0SUB4                                              *
+      *                                                              *
+      ****************************************************************

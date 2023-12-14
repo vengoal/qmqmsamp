@@ -1,0 +1,346 @@
+       IDENTIFICATION DIVISION.
+      ****************************************************************
+      *                                                              *
+      * Program name: AMQ0REQ4                                       *
+      *                                                              *
+      * Description: Sample COBOL program to put request messages    *
+      *              to a message queue and show the replies         *
+      *              (example using REPLY queue)                     *
+      *                                                              *
+      *   <copyright                                                 *
+      *   notice="lm-source-program"                                 *
+      *   pids="5724-H72,"                                           *
+      *   years="1993,2012"                                          *
+      *   crc="12416070" >                                           *
+      *   Licensed Materials - Property of IBM                       *
+      *                                                              *
+      *   5724-H72,                                                  *
+      *                                                              *
+      *   (C) Copyright IBM Corp. 1993, 2012 All Rights Reserved.    *
+      *                                                              *
+      *   US Government Users Restricted Rights - Use, duplication or  *
+      *   disclosure restricted by GSA ADP Schedule Contract with    *
+      *   IBM Corp.                                                  *
+      *   </copyright>                                               *
+      *                                                              *
+      ****************************************************************
+      *                                                              *
+      * Function:                                                    *
+      *                                                              *
+      *                                                              *
+      *   AMQ0REQ4 is a sample COBOL program to put messages to      *
+      *   a message queue, and then to show the reply messages       *
+      *                                                              *
+      *   Note: AMQ0REQ4 will only receive replies to its requests   *
+      *         if there is a program running, or triggered, to      *
+      *         respond to them.   Samples AMQ0INQA or AMQ0SETA      *
+      *         could be used for this purpose.                      *
+      *                                                              *
+      *      -- sample input is read using the ACCEPT verb,          *
+      *         taking a blank entry to indicate the end of          *
+      *         the input; the program parameter identifies          *
+      *         the target queue                                     *
+      *         (So if this sample is run in an interactive job,     *
+      *         lines would be read from the terminal)               *
+      *                                                              *
+      *      -- puts each input text line to the message queue,      *
+      *         taking each line of text as the content of a         *
+      *         request message                                      *
+      *                                                              *
+      *      -- displays the reply messages, assuming each           *
+      *         message to represent a line of text                  *
+      *                                                              *
+      *      -- writes a message for each MQI reason other than      *
+      *         MQRC-NONE; stops if there is a MQI completion        *
+      *         code of MQCC-FAILED                                  *
+      *                                                              *
+      *    Program logic:                                            *
+      *         MQCONN to the target queue manager                   *
+      *         MQOPEN server queue for OUTPUT                       *
+      *         MQOPEN reply queue for EXCLUSIVE INPUT               *
+      *         for each line in the input,                          *
+      *         .  MQPUT request message with text to server queue   *
+      *         while no MQI failures,                               *
+      *         .  MQGET message from reply queue                    *
+      *         .  display its content                               *
+      *         MQCLOSE both queues                                  *
+      *         MQDISC from the queue manager                        *
+      *                                                              *
+      ****************************************************************
+      *                                                              *
+      *                                                              *
+      *                                                              *
+      *   Exceptions signaled:  none                                 *
+      *   Exceptions monitored: none                                 *
+      *                                                              *
+      *   AMQ0REQ4 has 2 parameters - (1) name of the target queue   *
+      *                               (2) name of the queue manager  *
+      *                                                              *
+      ****************************************************************
+       PROGRAM-ID. AMQ0REQ4.
+
+      ****************************************************************
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+      *
+      **  Declare MQI structures needed
+      * MQI named constants
+       01 MY-MQ-CONSTANTS.
+          COPY CMQV.
+      * Object Descriptor
+       01 OBJECT-DESCRIPTOR.
+          COPY CMQODV.
+      * Message Descriptor
+       01 MESSAGE-DESCRIPTOR.
+          COPY CMQMDV.
+      * Put message options
+       01 PMOPTIONS.
+          COPY CMQPMOV.
+      * Get message options
+       01 GMOPTIONS.
+          COPY CMQGMOV.
+      ** note, sample uses defaults where it can
+      **   fixed reply queue name used in this example ...
+       01 REPLY-QUEUE  PIC X(48) VALUE "SYSTEM.SAMPLE.REPLY".
+       01 HCONN                      PIC S9(9) BINARY.
+       01 Q-HANDLE                   PIC S9(9) BINARY.
+       01 REPLY-HANDLE               PIC S9(9) BINARY.
+       01 OPTIONS                    PIC S9(9) BINARY.
+       01 COMPLETION-CODE            PIC S9(9) BINARY.
+       01 OPEN-CODE                  PIC S9(9) BINARY.
+       01 REASON                     PIC S9(9) BINARY.
+       01 BUFFER                     PIC X(48).
+       01 BUFFER-LENGTH              PIC S9(9) BINARY.
+       01 REPLY                      PIC X(64).
+       01 REPLY-LENGTH               PIC S9(9) BINARY.
+       01 DATA-LENGTH                PIC S9(9) BINARY.
+       LINKAGE SECTION.
+       01 TARGET-QUEUE               PIC X(48).
+       01 QUEUE-MANAGER              PIC X(48).
+
+      ****************************************************************
+       PROCEDURE DIVISION USING TARGET-QUEUE, QUEUE-MANAGER.
+       P0.
+      ** indicate that sample program has started
+           DISPLAY "AMQ0REQ4 start".
+      *
+      ****************************************************************
+      *                                                              *
+      *    use parameters as the name of the target queue            *
+      *                              and the queue manager           *
+      *                                                              *
+      ****************************************************************
+           DISPLAY "server queue is " TARGET-QUEUE.
+           DISPLAY "queue manager is " QUEUE-MANAGER.
+      *
+      ****************************************************************
+      *                                                              *
+      *   Connect to the queue manager                               *
+      *                                                              *
+      ****************************************************************
+           CALL "MQCONN"
+            USING QUEUE-MANAGER, HCONN,
+            COMPLETION-CODE, REASON.
+
+      *      report reason and stop if it failed
+           IF COMPLETION-CODE IS EQUAL TO MQCC-FAILED
+             DISPLAY "MQCONN ended with reason code " REASON
+             STOP RUN
+             END-IF.
+      *
+      ****************************************************************
+      *                                                              *
+      *   Open the server message queue for output (and fail if      *
+      *   MQM is quiescing)                                          *
+      *                                                              *
+      ****************************************************************
+       OPENS.
+           MOVE TARGET-QUEUE TO MQOD-OBJECTNAME.
+           ADD MQOO-OUTPUT MQOO-FAIL-IF-QUIESCING
+                     GIVING OPTIONS.
+           CALL "MQOPEN"
+            USING HCONN, OBJECT-DESCRIPTOR,
+            OPTIONS, Q-HANDLE,
+            OPEN-CODE, REASON.
+
+      *      report reason, if any; stop if failed
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             DISPLAY "MQOPEN ended with reason code " REASON
+             END-IF.
+
+           IF OPEN-CODE IS EQUAL TO MQCC-FAILED
+             DISPLAY "unable to open server queue for output"
+             STOP RUN
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *   Open the queue to receive reply messages                   *
+      *                                                              *
+      ****************************************************************
+       OPENR.
+           MOVE REPLY-QUEUE TO MQOD-OBJECTNAME.
+           ADD MQOO-INPUT-EXCLUSIVE MQOO-FAIL-IF-QUIESCING
+                     GIVING OPTIONS.
+           CALL "MQOPEN"
+            USING HCONN, OBJECT-DESCRIPTOR,
+            OPTIONS, REPLY-HANDLE,
+            OPEN-CODE, REASON.
+
+      *      report reason, if any; stop if failed
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             DISPLAY "MQOPEN ended with reason code " REASON
+             END-IF.
+
+           IF OPEN-CODE IS EQUAL TO MQCC-FAILED
+             DISPLAY "unable to open reply queue"
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *   Put request messages to the server queue                   *
+      *                                                              *
+      ****************************************************************
+       PUTS.
+           MOVE OPEN-CODE TO COMPLETION-CODE.
+           PERFORM PUTR WITH TEST BEFORE
+             UNTIL COMPLETION-CODE IS EQUAL TO MQCC-FAILED.
+
+      ****************************************************************
+      *                                                              *
+      *   Get reply messages                                         *
+      *                                                              *
+      ****************************************************************
+       GETS.
+           MOVE OPEN-CODE TO COMPLETION-CODE.
+           MOVE 300000 TO MQGMO-WAITINTERVAL.
+      *                    (5 minute limit for the first wait)
+           PERFORM GETR THRU DISPR WITH TEST BEFORE
+             UNTIL COMPLETION-CODE IS EQUAL TO MQCC-FAILED.
+
+      ****************************************************************
+      *                                                              *
+      *   Close both queues                                          *
+      *                                                              *
+      ****************************************************************
+       CLOSES.
+           MOVE MQCO-NONE TO OPTIONS.
+           CALL "MQCLOSE"
+            USING HCONN, Q-HANDLE, OPTIONS,
+            COMPLETION-CODE, REASON.
+
+      *      report reason, if any
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             DISPLAY "MQCLOSE (server) ended with reason code " REASON
+             END-IF.
+
+      * close reply queue - if it was opened
+           IF OPEN-CODE IS NOT EQUAL TO MQCC-FAILED
+             CALL "MQCLOSE"
+              USING HCONN, REPLY-HANDLE, OPTIONS,
+              COMPLETION-CODE, REASON
+
+      *      report reason, if any
+             IF REASON IS NOT EQUAL TO MQRC-NONE
+               DISPLAY "MQCLOSE (reply) ended with reason code "
+                                                    REASON
+               END-IF
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *   Disconnect from MQM (if not previously connected)          *
+      *                                                              *
+      ****************************************************************
+       DISCS.
+           CALL "MQDISC"
+            USING HCONN, COMPLETION-CODE, REASON.
+
+      *      report reason, if any
+            IF REASON IS NOT EQUAL TO MQRC-NONE
+              DISPLAY "MQDISC ended with reason code " REASON
+             END-IF.
+
+       OVER.
+      ** indicate that sample program has finished
+           DISPLAY "AMQ0REQ4 end".
+           STOP RUN.
+
+      ****************************************************************
+      *                                                              *
+      *   Put one request to the server queue                        *
+      *                                                              *
+      ****************************************************************
+       PUTR.
+           MOVE SPACES TO BUFFER.
+           ACCEPT BUFFER.
+           IF BUFFER IS NOT EQUAL TO SPACES
+             PERFORM PUTIT
+           ELSE
+             MOVE MQCC-FAILED TO COMPLETION-CODE.
+
+       PUTIT.
+           MOVE 48 to BUFFER-LENGTH.
+           MOVE MQMT-REQUEST to MQMD-MSGTYPE.
+           MOVE MQRO-EXCEPTION-WITH-DATA TO MQMD-REPORT.
+           MOVE REPLY-QUEUE TO MQMD-REPLYTOQ.
+
+           CALL "MQPUT"
+            USING HCONN, Q-HANDLE,
+            MESSAGE-DESCRIPTOR, PMOPTIONS,
+            BUFFER-LENGTH, BUFFER,
+            COMPLETION-CODE, REASON.
+
+      *      report reason, if any
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             DISPLAY "MQPUT ended with reason code " REASON
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *   Get one reply message                                      *
+      *                                                              *
+      ****************************************************************
+       GETR.
+           MOVE SPACES TO REPLY.
+           ADD MQGMO-WAIT MQGMO-ACCEPT-TRUNCATED-MSG
+                     GIVING MQGMO-OPTIONS.
+           MOVE 64 to REPLY-LENGTH.
+      **  clear selectors to get messages in sequence
+           MOVE MQMI-NONE TO MQMD-MSGID.
+           MOVE MQCI-NONE TO MQMD-CORRELID.
+
+           CALL "MQGET"
+            USING HCONN, REPLY-HANDLE,
+            MESSAGE-DESCRIPTOR, GMOPTIONS,
+            REPLY-LENGTH, REPLY, DATA-LENGTH,
+            COMPLETION-CODE, REASON.
+      *      set 15 second limit for subsequent waits
+           MOVE 15000 TO MQGMO-WAITINTERVAL.
+
+      ****************************************************************
+      *                                                              *
+      *   Display reply or report received                           *
+      *                                                              *
+      ****************************************************************
+       DISPR.
+      ** report reason, if any
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             IF REASON IS EQUAL TO MQRC-NO-MSG-AVAILABLE
+               DISPLAY "no more replies"
+             ELSE
+               DISPLAY "MQGET ended with reason code " REASON
+             END-IF
+           END-IF.
+
+      ** display reply or report
+           IF COMPLETION-CODE IS NOT EQUAL TO MQCC-FAILED
+             DISPLAY "response <" REPLY ">"
+             IF MQMD-MSGTYPE IS EQUAL TO MQMT-REPORT
+               DISPLAY "  report with feedback = " MQMD-FEEDBACK.
+
+      ****************************************************************
+      *                                                              *
+      * END OF AMQ0REQ4                                              *
+      *                                                              *
+      ****************************************************************

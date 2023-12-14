@@ -1,0 +1,415 @@
+       IDENTIFICATION DIVISION.
+      ****************************************************************
+      *                                                              *
+      * Program name: AMQ0INQ4                                       *
+      *                                                              *
+      * Description: Sample COBOL program using MQINQ                *
+      *                                                              *
+      *   <copyright                                                 *
+      *   notice="lm-source-program"                                 *
+      *   pids="5724-H72,"                                           *
+      *   years="1993,2012"                                          *
+      *   crc="2091861732" >                                         *
+      *   Licensed Materials - Property of IBM                       *
+      *                                                              *
+      *   5724-H72,                                                  *
+      *                                                              *
+      *   (C) Copyright IBM Corp. 1993, 2012 All Rights Reserved.    *
+      *                                                              *
+      *   US Government Users Restricted Rights - Use, duplication or  *
+      *   disclosure restricted by GSA ADP Schedule Contract with    *
+      *   IBM Corp.                                                  *
+      *   </copyright>                                               *
+      *                                                              *
+      ****************************************************************
+      *                                                              *
+      * Function:                                                    *
+      *                                                              *
+      *                                                              *
+      *   AMQ0INQ4 is a sample COBOL program that inquires           *
+      *   selected attributes of a message queue, an example         *
+      *   using MQINQ.  It is intended to run as a triggered         *
+      *   program, and so receives input in a trigger parameter.     *
+      *                                                              *
+      *   Note: one way to run AMQ0INQ4 is to be running AMQSERV4    *
+      *         trigger server, and to use AMQ0REQ4 to send          *
+      *         request messages (containing queue names) to a       *
+      *         queue (eg SYSTEM.SAMPLE.INQ) which must have been    *
+      *         defined to trigger AMQ0INQ4.                         *
+      *                                                              *
+      *      -- gets request messages from a queue whose name is     *
+      *         in the trigger parameter; the content of each        *
+      *         message is the name of a message queue               *
+      *                                                              *
+      *      -- sends a reply message to the named reply queue       *
+      *         which contains the values of the following           *
+      *         attributes                                           *
+      *                                                              *
+      *         -- current depth of the queue                        *
+      *         -- whether the queue has GET inhibited               *
+      *         -- number of jobs with the queue open for input      *
+      *                                                              *
+      *         alternatively, sends a report message if the         *
+      *         queue can't  be inquired - eg, if the queue to       *
+      *         be inquired does not exist                           *
+      *                                                              *
+      *      -- stops when the input queue becomes empty             *
+      *                                                              *
+      *      -- writes a message for each MQI reason other than      *
+      *         MQRC-NONE; stops if there is a MQI completion code   *
+      *         of MQCC-FAILED                                       *
+      *                                                              *
+      *    Program logic:                                            *
+      *         MQCONNect to message queue manager                   *
+      *         MQOPEN message queue (A) for shared input            *
+      *         while no MQI failures,                               *
+      *         .  MQGET next message from queue A                   *
+      *         .  if message is a request,                          *
+      *         .  .  MQOPEN queue (B) named in request for INQUIRE  *
+      *         .  .  Use MQINQ, find values of B's attributes       *
+      *         .  .  Prepare reply message if MQINQ was successful  *
+      *         .  .  MQCLOSE queue B                                *
+      *         .  .  Prepare report message if reply not available  *
+      *         .  .  MQPUT1, send reply or report to reply queue    *
+      *         MQCLOSE queue A                                      *
+      *         MQDISConnect from queue manager                      *
+      *                                                              *
+      *                                                              *
+      ****************************************************************
+      *                                                              *
+      *                                                              *
+      *                                                              *
+      *   Exceptions signaled:  none                                 *
+      *   Exceptions monitored: none                                 *
+      *                                                              *
+      *   AMQ0INQ4 has 1 parameter - a string based on the           *
+      *       initiation trigger message; only the QNmame            *
+      *       field is used in this example                          *
+      *                                                              *
+      ****************************************************************
+       PROGRAM-ID. AMQ0INQ4.
+
+      ****************************************************************
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+      *
+      **  Declare MQI structures needed
+      * MQI named constants
+       01 MY-MQ-CONSTANTS.
+          COPY CMQV.
+      * Object Descriptor
+       01 OBJECT-DESCRIPTOR.
+          COPY CMQODV.
+      * Message Descriptor
+       01 MESSAGE-DESCRIPTOR.
+          COPY CMQMDV.
+      * Get message options
+       01 GMOPTIONS.
+          COPY CMQGMOV.
+      * Put message options
+       01 PMOPTIONS.
+          COPY CMQPMOV.
+      ** note, sample uses defaults where it can
+       01 QM-NAME                    PIC X(48) VALUE SPACES.
+       01 HCONN                      PIC S9(9) BINARY.
+       01 Q-HANDLE                   PIC S9(9) BINARY.
+       01 INQ-HANDLE                 PIC S9(9) BINARY.
+       01 OPTIONS                    PIC S9(9) BINARY.
+       01 COMPLETION-CODE            PIC S9(9) BINARY.
+       01 OPEN-CODE                  PIC S9(9) BINARY.
+       01 CON-REASON                 PIC S9(9) BINARY.
+       01 REASON                     PIC S9(9) BINARY.
+       01 BUFFER-LENGTH              PIC S9(9) BINARY.
+       01 DATA-LENGTH                PIC S9(9) BINARY.
+       01 SELECT-COUNT               PIC S9(9) BINARY VALUE 3.
+       01 SELECTOR-TABLE.
+         02 SELECTOR                 PIC S9(9) BINARY OCCURS 3 TIMES.
+       01 INT-ATTR-COUNT             PIC S9(9) BINARY VALUE 3.
+       01 INT-ATTR-TABLE.
+         02 INT-ATTR                 PIC S9(9) BINARY OCCURS 3 TIMES.
+       01 CHAR-ATTR-LENGTH           PIC S9(9) BINARY VALUE 0.
+       01 CHAR-ATTRS                 PIC X(100).
+
+      ** message is read into buffer; reply contains an extension
+       01 REPLY.
+         02 BUFFER                   PIC X(48).
+         02 V1                       PIC ZZ9.
+         02 BUF1                     PIC X(10) VALUE " messages;".
+         02 V2                       PIC Z9.
+         02 BUF2                     PIC X(5) VALUE " jobs".
+         02 BUF3                     PIC X(15) VALUE "; GET inhibited".
+
+       LINKAGE SECTION.
+       01 TRIGGER-DATA.
+          COPY CMQTMCL.
+
+      ****************************************************************
+       PROCEDURE DIVISION USING TRIGGER-DATA.
+       P0.
+      ** indicate that sample program has started
+           DISPLAY "AMQ0INQ4 start".
+
+      ****************************************************************
+      *                                                              *
+      *   This sample includes an explicit connect (MQCONN)          *
+      *                                                              *
+      ****************************************************************
+           CALL "MQCONN"
+            USING QM-NAME, HCONN,
+            COMPLETION-CODE, CON-REASON.
+
+      *      report reason and stop if it failed
+           IF COMPLETION-CODE IS EQUAL TO MQCC-FAILED
+             DISPLAY "MQCONN ended with reason code " CON-REASON
+             STOP RUN
+             END-IF.
+      *
+      ****************************************************************
+      *                                                              *
+      *   Open the message queue for shared input                    *
+      *                                                              *
+      ****************************************************************
+       OPENS.
+           MOVE MQTMC-QNAME TO MQOD-OBJECTNAME.
+           ADD MQOO-INPUT-SHARED MQOO-FAIL-IF-QUIESCING
+                     GIVING OPTIONS.
+           CALL "MQOPEN"
+            USING HCONN, OBJECT-DESCRIPTOR,
+            OPTIONS, Q-HANDLE,
+            OPEN-CODE, REASON.
+
+      *      report reason, if any; stop if failed
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             DISPLAY "MQOPEN (input) ended with reason code " REASON
+             END-IF.
+
+           IF OPEN-CODE IS EQUAL TO MQCC-FAILED
+             DISPLAY "unable to open queue for input"
+             STOP RUN
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *   Get messages from the message queue                        *
+      *                                                              *
+      ****************************************************************
+       GETS.
+           MOVE OPEN-CODE TO COMPLETION-CODE.
+           PERFORM GETR THRU RESPR WITH TEST BEFORE
+             UNTIL COMPLETION-CODE IS EQUAL TO MQCC-FAILED.
+
+      ****************************************************************
+      *                                                              *
+      *   Close the source queue                                     *
+      *                                                              *
+      ****************************************************************
+       CLOSES.
+           MOVE MQCO-NONE TO OPTIONS.
+           CALL "MQCLOSE"
+            USING HCONN, Q-HANDLE, OPTIONS,
+            COMPLETION-CODE, REASON.
+
+      *      report reason, if any
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             DISPLAY "MQCLOSE ended with reason code " REASON
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *   Disconnect from MQM (if not previously connected)          *
+      *                                                              *
+      ****************************************************************
+       DISCS.
+           IF CON-REASON IS NOT EQUAL TO MQRC-ALREADY-CONNECTED
+             CALL "MQDISC"
+              USING HCONN, COMPLETION-CODE, REASON
+
+      *      report reason, if any
+             IF REASON IS NOT EQUAL TO MQRC-NONE
+               DISPLAY "MQDISC ended with reason code " REASON
+             END-IF
+           END-IF.
+
+       OVER.
+      ** indicate that sample program has finished
+           DISPLAY "AMQ0INQ4 end".
+           STOP RUN.
+
+      ****************************************************************
+      *                                                              *
+      *   Get one message (request)                                  *
+      *                                                              *
+      ****************************************************************
+       GETR.
+           MOVE SPACES TO BUFFER.
+           ADD MQGMO-ACCEPT-TRUNCATED-MSG MQGMO-WAIT
+                GIVING MQGMO-OPTIONS.
+           MOVE 5000 TO MQGMO-WAITINTERVAL.
+           MOVE 48 to BUFFER-LENGTH.
+      **  clear selectors to get messages in sequence
+           MOVE MQMI-NONE TO MQMD-MSGID.
+           MOVE MQCI-NONE TO MQMD-CORRELID.
+
+           CALL "MQGET"
+            USING HCONN, Q-HANDLE,
+            MESSAGE-DESCRIPTOR, GMOPTIONS,
+            BUFFER-LENGTH, BUFFER, DATA-LENGTH,
+            COMPLETION-CODE, REASON.
+
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             IF REASON IS EQUAL TO MQRC-NO-MSG-AVAILABLE
+               DISPLAY "no more messages"
+             ELSE
+               DISPLAY "MQGET ended with reason code " REASON
+             END-IF
+           END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *   Display message received                                   *
+      *                                                              *
+      ****************************************************************
+       DISPM.
+           IF COMPLETION-CODE IS NOT EQUAL TO MQCC-FAILED
+             DISPLAY "message is <" BUFFER ">"
+           END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *  Respond to requests only                                    *
+      *                                                              *
+      ****************************************************************
+       RESPR.
+           IF COMPLETION-CODE IS EQUAL TO MQCC-OK
+             IF MQMD-MSGTYPE IS NOT EQUAL TO MQMT-REQUEST
+               DISPLAY "  -- not a request and discarded"
+             ELSE
+               PERFORM RESP1 THRU RESP3
+             END-IF
+           END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *  Process a request message                                   *
+      *                                                              *
+      ****************************************************************
+       RESP1.
+           MOVE BUFFER TO MQOD-OBJECTNAME.
+           PERFORM OPENI.
+           IF COMPLETION-CODE IS EQUAL TO MQCC-OK
+             PERFORM INQ THRU CLOSEI
+           END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *  Create report if not a reply                                *
+      *                                                              *
+      ****************************************************************
+       RESP2.
+      ** in this sample, the ???? message data is sent in the report
+           IF MQMD-MSGTYPE IS EQUAL TO MQMT-REPORT
+             MOVE 0  TO BUFFER-LENGTH.
+
+      ****************************************************************
+      *                                                              *
+      *  Send the reply or report message                            *
+      *                                                              *
+      ****************************************************************
+       RESP3.
+      ** stop further reports
+           MOVE MQRO-NONE TO MQMD-REPORT.
+      ** copy reply queue names
+           MOVE MQMD-REPLYTOQ TO MQOD-OBJECTNAME.
+           MOVE MQMD-REPLYTOQMGR TO MQOD-OBJECTQMGRNAME.
+      ** use message ID of request as the Correlation ID
+           MOVE MQMD-MSGID TO MQMD-CORRELID.
+      ** put single message, reply or report
+           CALL "MQPUT1"
+            USING HCONN, OBJECT-DESCRIPTOR,
+            MESSAGE-DESCRIPTOR, PMOPTIONS,
+            BUFFER-LENGTH, REPLY,
+            COMPLETION-CODE, REASON.
+
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             DISPLAY "MQPUT1 ended with reason code " REASON
+             END-IF.
+
+      ** Note - this sample stops if MQPUT1 fails; in some
+      **        applications it may be appropriate to
+      **        continue after selected REASON codes
+
+      ****************************************************************
+      *                                                              *
+      *  Open subject queue for INQUIRE                              *
+      *                                                              *
+      ****************************************************************
+       OPENI.
+           ADD MQOO-INQUIRE MQOO-FAIL-IF-QUIESCING
+                     GIVING OPTIONS.
+           CALL "MQOPEN"
+            USING HCONN, OBJECT-DESCRIPTOR,
+            OPTIONS, INQ-HANDLE,
+            COMPLETION-CODE, REASON.
+
+           IF COMPLETION-CODE IS EQUAL TO MQCC-FAILED
+             MOVE MQMT-REPORT to MQMD-MSGTYPE
+             MOVE REASON TO MQMD-FEEDBACK
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *  INQUIRE attributes of a queue                               *
+      *                                                              *
+      ****************************************************************
+       INQ.
+           MOVE MQIA-INHIBIT-GET TO SELECTOR(1).
+           MOVE MQIA-CURRENT-Q-DEPTH TO SELECTOR(2).
+           MOVE MQIA-OPEN-INPUT-COUNT TO SELECTOR(3).
+           CALL "MQINQ"
+            USING HCONN, INQ-HANDLE,
+            SELECT-COUNT, SELECTOR-TABLE,
+            INT-ATTR-COUNT, INT-ATTR-TABLE,
+            CHAR-ATTR-LENGTH, CHAR-ATTRS,
+            COMPLETION-CODE, REASON.
+
+      ****************************************************************
+      *                                                              *
+      *  Prepare reply message if INQUIRE worked                     *
+      *                                                              *
+      ****************************************************************
+       IREPLY.
+           IF COMPLETION-CODE IS EQUAL TO MQCC-OK
+             MOVE INT-ATTR(2) TO V1
+             MOVE INT-ATTR(3) TO V2
+             IF INT-ATTR(1) IS NOT EQUAL TO 0
+               MOVE 83 TO BUFFER-LENGTH
+             ELSE
+               MOVE 68 TO BUFFER-LENGTH
+             END-IF
+             MOVE MQMT-REPLY TO MQMD-MSGTYPE
+           ELSE
+             MOVE MQMT-REPORT TO MQMD-MSGTYPE
+             MOVE REASON TO MQMD-FEEDBACK
+           END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *  CLOSE the INQUIRE queue                                     *
+      *                                                              *
+      ****************************************************************
+       CLOSEI.
+           MOVE MQCO-NONE TO OPTIONS.
+           CALL "MQCLOSE"
+            USING HCONN, INQ-HANDLE, OPTIONS,
+            COMPLETION-CODE, REASON.
+
+      *      report reason, if any
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             DISPLAY "MQCLOSE ended with reason code " REASON
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      * END OF AMQ0INQ4                                              *
+      *                                                              *
+      ****************************************************************

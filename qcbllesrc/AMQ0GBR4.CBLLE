@@ -1,0 +1,260 @@
+       IDENTIFICATION DIVISION.
+      ****************************************************************
+      *                                                              *
+      * Program name: AMQ0GBR4                                       *
+      *                                                              *
+      * Description: Sample COBOL program that displays messages     *
+      *              that are on a message queue (example using      *
+      *              Browse option of MQGET)                         *
+      *                                                              *
+      *   <copyright                                                 *
+      *   notice="lm-source-program"                                 *
+      *   pids="5724-H72,"                                           *
+      *   years="1993,2012"                                          *
+      *   crc="1413310362" >                                         *
+      *   Licensed Materials - Property of IBM                       *
+      *                                                              *
+      *   5724-H72,                                                  *
+      *                                                              *
+      *   (C) Copyright IBM Corp. 1993, 2012 All Rights Reserved.    *
+      *                                                              *
+      *   US Government Users Restricted Rights - Use, duplication or  *
+      *   disclosure restricted by GSA ADP Schedule Contract with    *
+      *   IBM Corp.                                                  *
+      *   </copyright>                                               *
+      *                                                              *
+      ****************************************************************
+      *                                                              *
+      * Function:                                                    *
+      *                                                              *
+      *                                                              *
+      *   AMQ0GBR4 is a sample COBOL program to display messages     *
+      *   that are on a message queue, and is an example using       *
+      *   Browse option of MQGET                                     *
+      *                                                              *
+      *      -- sample gets messages from the queue named in         *
+      *         the program parameter                                *
+      *                                                              *
+      *      -- displays the contents of the message queue,          *
+      *         assuming each message data to represent a line       *
+      *         of text to be written                                *
+      *                                                              *
+      *         only the first 20 characters of each message is      *
+      *         shown; incomplete messages are noted                 *
+      *                                                              *
+      *         leaves the messages on the queue                     *
+      *                                                              *
+      *         the displayed name of the queue is the resolved      *
+      *         local queue name if the object name is an alias      *
+      *                                                              *
+      *      -- writes a message for each MQI reason other than      *
+      *         MQRC-NONE; stops if there is a MQI completion code   *
+      *         of MQCC-FAILED                                       *
+      *                                                              *
+      *    Program logic:                                            *
+      *         MQCONN to the target queue manager                   *
+      *         MQOPEN queue for BROWSE                              *
+      *         while no MQI failures,                               *
+      *         .  MQGET next message (browse)                       *
+      *         .  display Resolved Queue Name first time            *
+      *         .  display up to 20 bytes of message data            *
+      *         MQCLOSE the source queue                             *
+      *         MQDISC from the queue manager                        *
+      *                                                              *
+      ****************************************************************
+      *                                                              *
+      *                                                              *
+      *                                                              *
+      *   Exceptions signaled:  none                                 *
+      *   Exceptions monitored: none                                 *
+      *                                                              *
+      *   AMQ0GBR4 has 2 parameters - (1) name of the target queue   *
+      *                               (2) name of the queue manager  *
+      *                                                              *
+      ****************************************************************
+       PROGRAM-ID. AMQ0GBR4.
+
+      ****************************************************************
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+      *
+      **  Declare MQI structures needed
+      * MQI named constants
+       01 MY-MQ-CONSTANTS.
+          COPY CMQV.
+      * Object Descriptor
+       01 OBJECT-DESCRIPTOR.
+          COPY CMQODV.
+      * Message Descriptor
+       01 MESSAGE-DESCRIPTOR.
+          COPY CMQMDV.
+      * Get message options
+       01 GMOPTIONS.
+          COPY CMQGMOV.
+      ** note, sample uses defaults where it can
+       01 HCONN                      PIC S9(9) BINARY.
+       01 Q-HANDLE                   PIC S9(9) BINARY.
+       01 OPTIONS                    PIC S9(9) BINARY.
+       01 COMPLETION-CODE            PIC S9(9) BINARY.
+       01 OPEN-CODE                  PIC S9(9) BINARY.
+       01 REASON                     PIC S9(9) BINARY.
+       01 BUFFER                     PIC X(20).
+       01 BUFFER-LENGTH              PIC S9(9) BINARY.
+       01 DATA-LENGTH                PIC S9(9) BINARY.
+       01 MSG-COUNT                  PIC 9999.
+       LINKAGE SECTION.
+       01 TARGET-QUEUE               PIC X(48).
+       01 QUEUE-MANAGER              PIC X(48).
+
+      ****************************************************************
+       PROCEDURE DIVISION USING TARGET-QUEUE, QUEUE-MANAGER.
+       P0.
+      ** indicate that sample program has started
+           DISPLAY "AMQ0GBR4 start".
+
+      ****************************************************************
+      *                                                              *
+      *   Connect to the queue manager                               *
+      *                                                              *
+      ****************************************************************
+           CALL "MQCONN"
+            USING QUEUE-MANAGER, HCONN,
+            COMPLETION-CODE, REASON.
+
+      *      report reason and stop if it failed
+           IF COMPLETION-CODE IS EQUAL TO MQCC-FAILED
+             DISPLAY "MQCONN ended with reason code " REASON
+             STOP RUN
+             END-IF.
+      *
+      ****************************************************************
+      *                                                              *
+      *   Open the message queue for Browse (and fail if MQM         *
+      *   is quiescing)                                              *
+      *                                                              *
+      ****************************************************************
+       OPENS.
+           MOVE TARGET-QUEUE TO MQOD-OBJECTNAME.
+           ADD MQOO-BROWSE MQOO-FAIL-IF-QUIESCING
+                     GIVING OPTIONS.
+           CALL "MQOPEN"
+            USING HCONN, OBJECT-DESCRIPTOR,
+            OPTIONS, Q-HANDLE,
+            OPEN-CODE, REASON.
+
+      *      report reason, if any; stop if failed
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             DISPLAY "MQOPEN ended with reason code " REASON
+             END-IF.
+
+           IF OPEN-CODE IS EQUAL TO MQCC-FAILED
+             DISPLAY "unable to open server queue for output"
+             STOP RUN
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *   Get messages from the message queue                        *
+      *                                                              *
+      ****************************************************************
+       GETS.
+           MOVE OPEN-CODE TO COMPLETION-CODE.
+           MOVE 0 TO MSG-COUNT.
+           PERFORM GETR THRU DISPR WITH TEST BEFORE
+             UNTIL COMPLETION-CODE IS EQUAL TO MQCC-FAILED.
+
+      ****************************************************************
+      *                                                              *
+      *   Close the source queue                                     *
+      *                                                              *
+      ****************************************************************
+       CLOSES.
+           MOVE MQCO-NONE TO OPTIONS.
+           CALL "MQCLOSE"
+            USING HCONN, Q-HANDLE, OPTIONS,
+            COMPLETION-CODE, REASON.
+
+      *      report reason, if any
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             DISPLAY "MQCLOSE ended with reason code " REASON
+             END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *   Disconnect from MQM (if not previously connected)          *
+      *                                                              *
+      ****************************************************************
+       DISCS.
+           CALL "MQDISC"
+            USING HCONN, COMPLETION-CODE, REASON.
+
+      *      report reason, if any
+            IF REASON IS NOT EQUAL TO MQRC-NONE
+              DISPLAY "MQDISC ended with reason code " REASON
+             END-IF.
+
+       OVER.
+      ** indicate that sample program has finished
+           DISPLAY "AMQ0GBR4 end".
+           STOP RUN.
+
+      ****************************************************************
+      *                                                              *
+      *   Get one message                                            *
+      *                                                              *
+      ****************************************************************
+       GETR.
+           MOVE SPACES TO BUFFER.
+           ADD MQGMO-NO-WAIT MQGMO-BROWSE-NEXT
+               MQGMO-ACCEPT-TRUNCATED-MSG
+               MQGMO-CONVERT
+                     GIVING MQGMO-OPTIONS.
+           MOVE 15000 TO MQGMO-WAITINTERVAL.
+           MOVE 20 to BUFFER-LENGTH.
+      **  clear selectors to get messages in sequence
+           MOVE MQMI-NONE TO MQMD-MSGID.
+           MOVE MQCI-NONE TO MQMD-CORRELID.
+
+           CALL "MQGET"
+            USING HCONN, Q-HANDLE,
+            MESSAGE-DESCRIPTOR, GMOPTIONS,
+            BUFFER-LENGTH, BUFFER, DATA-LENGTH,
+            COMPLETION-CODE, REASON.
+
+      ****************************************************************
+      *                                                              *
+      *   Display message received                                   *
+      *                                                              *
+      ****************************************************************
+       DISPM.
+           IF COMPLETION-CODE IS NOT EQUAL TO MQCC-FAILED
+             IF MSG-COUNT IS EQUAL TO 0
+               DISPLAY "Messages in " MQGMO-RESOLVEDQNAME
+             END-IF
+             ADD 1 TO MSG-COUNT
+             DISPLAY MSG-COUNT " <" BUFFER ">"
+           END-IF.
+
+      ****************************************************************
+      *                                                              *
+      *  Report reason, if any                                       *
+      *                                                              *
+      ****************************************************************
+       DISPR.
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             IF REASON IS EQUAL TO MQRC-NO-MSG-AVAILABLE
+               DISPLAY "no more messages"
+             ELSE
+               IF DATA-LENGTH IS GREATER THAN BUFFER-LENGTH
+                 DISPLAY "   --- truncated"
+               ELSE
+                 DISPLAY "MQGET ended with reason code " REASON
+               END-IF
+             END-IF
+           END-IF.
+
+      ****************************************************************
+      *                                                              *
+      * END OF AMQ0GBR4                                              *
+      *                                                              *
+      ****************************************************************

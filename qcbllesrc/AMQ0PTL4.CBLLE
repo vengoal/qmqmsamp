@@ -1,0 +1,477 @@
+       IDENTIFICATION DIVISION.
+      ****************************************************************
+      *                                                              *
+      *                                                              *
+      * Program name: AMQ0PTL4                                       *
+      *                                                              *
+      * Description: Sample COBOL program that demonstrates the use  *
+      *              of distribution lists                           *
+      *                                                              *
+      *                                                              *
+      *   <copyright                                                 *
+      *   notice="lm-source-program"                                 *
+      *   pids="5724-H72,"                                           *
+      *   years="1993,2015"                                          *
+      *   crc="1018985817" >                                         *
+      *   Licensed Materials - Property of IBM                       *
+      *                                                              *
+      *   5724-H72,                                                  *
+      *                                                              *
+      *   (C) Copyright IBM Corp. 1993, 2015 All Rights Reserved.    *
+      *                                                              *
+      *   US Government Users Restricted Rights - Use, duplication or*
+      *   disclosure restricted by GSA ADP Schedule Contract with    *
+      *   IBM Corp.                                                  *
+      *   </copyright>                                               *
+      *                                                              *
+      ****************************************************************
+      *                                                              *
+      * Function:                                                    *
+      *                                                              *
+      *                                                              *
+      *   AMQ0PTL4 is a sample COBOL program to put a message on     *
+      *   a list of  message queues.                                 *
+      *   AMQ0PTL4 is an example of the use of MQPUT using           *
+      *   distribution lists.                                        *
+      *   AMQ0PTL4 is based on AMQ0PUT0 and AMQ0PTL0.                *
+      *                                                              *
+      *                                                              *
+      *   For simplicity, the maximum size of the distribution list  *
+      *   is set at 10. The sample will only attempt a single message*
+      *   put.                                                       *
+      *                                                              *
+      *                                                              *
+      *                                                              *
+      *      -- List of queues and queue managers (distribution list)*
+      *         is read using the ACCEPT verb, with special queue    *
+      *         name 'ENDLIST' indicating the end of input.          *
+      *                                                              *
+      *      -- sample message input is read using the ACCEPT        *
+      *         verb.                                                *
+      *                                                              *
+      *      -- puts the text line in the input to the message       *
+      *         queues defined by the distribution list,             *
+      *         taking the line of text as the content               *
+      *         of a message                                         *
+      *                                                              *
+      *      -- writes a message for each MQI reason other than      *
+      *         MQRC-NONE; stops if there is a MQI completion        *
+      *         code of MQCC-FAILED                                  *
+      *                                                              *
+      *    Program logic:                                            *
+      *         displays prompts for pairs of queue and queue manager*
+      *         ACCEPT list from end-user                            *
+      *         MQCONNect to the default queue manager               *
+      *         MQOPEN target queues for OUTPUT                      *
+      *         display prompt for message                           *
+      *         ACCEPT line of text                                  *
+      *         MQPUT message with text to target queues             *
+      *         MQCLOSE target queues                                *
+      *         MQDISConnect from queue manager                      *
+      *                                                              *
+      *                                                              *
+      ****************************************************************
+      *                                                              *
+      *   Exceptions signaled:  none                                 *
+      *   Exceptions monitored: none                                 *
+      *                                                              *
+      *   AMQ0PTL4 has no parameters                                 *
+      *                                                              *
+      ****************************************************************
+       PROGRAM-ID. 'AMQ0PTL4'.
+
+      ****************************************************************
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+      *
+      **  Declare MQI structures needed
+      * MQI named constants
+       01 MY-MQ-CONSTANTS.
+          COPY CMQV.
+      *
+      * Structure containing all required MQ structures
+      *
+       01 MQ-STRUCTURES.
+      *
+      * Object Descriptor
+        05 OBJECT-DESCRIPTOR.
+          COPY CMQODV.
+      *
+      ****************************************************************
+      *   Maximum distribution list for this sample is 10 queues     *
+      ****************************************************************
+        05 OBJECT-RECORDS.
+      **   MQOR structure (one for each destination)
+         10 MQOR OCCURS 10 TIMES.
+      **    Object name
+          15 MQOR-OBJECTNAME      PIC X(48) VALUE SPACES.
+      **    Object queue manager name
+          15 MQOR-OBJECTQMGRNAME  PIC X(48) VALUE SPACES.
+      *
+      ****************************************************************
+      *   Response records will be used by MQOPEN, MQPUT and MQCLOSE *
+      ****************************************************************
+        05 RESPONSE-RECORDS.
+      **   MQRR structure (one for each destination)
+         10 MQRR OCCURS 10 TIMES.
+      **    Completion code
+          15 MQRR-COMPCODE        PIC S9(9) BINARY VALUE 0.
+      **    Reason code
+          15 MQRR-REASON          PIC S9(9) BINARY VALUE 0.
+      *
+      * Message Descriptor
+        05 MESSAGE-DESCRIPTOR.
+          COPY CMQMDV.
+      *
+      * Put message options
+        05 PMOPTIONS.
+          COPY CMQPMOV.
+      *
+      * Put message records
+      ****************************************************************
+      *   In this sample we will only pass msgid and correl id       *
+      *   The pmr array will contain the VALUEs to be used.          *
+      ****************************************************************
+        05 PMRS.
+         10 PUT-MSG-RECORD OCCURS 10 TIMES.
+          15 PMR-MSGID            PIC X(24) VALUE SPACES.
+          15 PMR-CORREL-ID        PIC X(24) VALUE SPACES.
+      *
+      ** note, sample uses defaults where it can
+      *
+       01 WORKING-VARIABLES.
+      *
+        05 QM-NAME                PIC X(48) VALUE SPACES.
+        05 HCONN                  PIC S9(9) BINARY.
+        05 Q-HANDLE               PIC S9(9) BINARY.
+        05 OPTIONS                PIC S9(9) BINARY.
+        05 COMPLETION-CODE        PIC S9(9) BINARY.
+        05 OPEN-CODE              PIC S9(9) BINARY.
+        05 CON-REASON             PIC S9(9) BINARY.
+        05 REASON                 PIC S9(9) BINARY.
+        05 BUFFER                 PIC X(60) VALUE SPACES.
+        05 BUFFER-LENGTH          PIC S9(9) BINARY VALUE 60.
+        05 TARGET-QUEUE           PIC X(48) VALUE SPACES.
+        05 TARGET-QUEUE-MANAGER   PIC X(48) VALUE SPACES.
+        05 NUM-QUEUES             PIC S9(9) BINARY VALUE ZERO.
+        05 RR-COUNT               PIC S9(9) BINARY VALUE ZERO.
+        05 DISPLAY-NUM-QUEUES     PIC ZZ9.
+        05 ERR-MESSAGE.
+         10 MQ-VERB               PIC X(7)  VALUE SPACES.
+         10 FILLER                PIC X(5)  VALUE ' for '.
+         10 ERR-Q                 PIC X(8)  VALUE SPACES.
+         10 FILLER                PIC X     VALUE '('.
+         10 ERR-QMGR              PIC X(8)  VALUE SPACES.
+         10 FILLER                PIC X     VALUE ')'.
+         10 FILLER                PIC X(20) VALUE ' returned Compcode='.
+         10 ERR-CC                PIC 9(4).
+         10 FILLER                PIC X(9)  VALUE ', Reason='.
+         10 ERR-RC                PIC 9(4).
+         10 FILLER                PIC X(5)  VALUE SPACES.
+      *
+      *
+      ****************************************************************
+       PROCEDURE DIVISION.
+       P0.
+      ** indicate that sample program has started
+           DISPLAY 'AMQ0PTL4 start'.
+
+           PERFORM MQ-CONNECT.
+
+           PERFORM READ-DIST-LIST.
+
+      ****************************************************************
+      *   Set up the distribution list information.                  *
+      *   Example uses offsets rather than pointers.                 *
+      *   The offsets of both the object records and the response    *
+      *   records are given relative to the start of the object      *
+      *   descriptor.                                                *
+      ****************************************************************
+           MOVE MQOD-VERSION-2          TO MQOD-VERSION.
+           MOVE NUM-QUEUES              TO MQOD-RECSPRESENT.
+           MOVE LENGTH OF OBJECT-DESCRIPTOR
+                                        TO MQOD-OBJECTRECOFFSET.
+
+           ADD  LENGTH OF OBJECT-DESCRIPTOR,
+                LENGTH OF OBJECT-RECORDS
+                                        GIVING MQOD-RESPONSERECOFFSET.
+
+           PERFORM OPEN-QUEUES.
+
+      ****************************************************************
+      *   Set up the data ready for the put to a distribution list   *
+      *                                                              *
+      *   For simplicity the same response records use by the MQOPEN *
+      *   are used, although seperate ones can be used.              *
+      ****************************************************************
+           MOVE MQPMO-VERSION-2      to MQPMO-VERSION.
+           MOVE NUM-QUEUES           to MQPMO-RECSPRESENT.
+
+      ****************************************************************
+      *                                                              *
+      *   Set up the offsets. Since we are re-using the MQOPEN       *
+      *   response records, we need to calculate their offset        *
+      *   relative to the PMO record. This will be a negative offset.*
+      ****************************************************************
+
+           MOVE LENGTH OF PMOPTIONS TO MQPMO-PUTMSGRECOFFSET.
+
+           SUBTRACT LENGTH OF RESPONSE-RECORDS,
+                    LENGTH OF MESSAGE-DESCRIPTOR
+                                     FROM MQPMO-RESPONSERECOFFSET.
+
+      ****************************************************************
+      *                                                              *
+      *   The sample allows msgid and correl id to be set for each   *
+      *   destination queue. In this case the pmrs are set to SPACES.*
+      *                                                              *
+      ****************************************************************
+
+           ADD  MQPMRF-MSG-ID,
+                MQPMRF-CORREL-ID
+                                     GIVING MQPMO-PUTMSGRECFIELDS.
+
+           PERFORM PUT-MESSAGE.
+
+           PERFORM CLOSE-QUEUES.
+
+           PERFORM MQ-DISCONNECT.
+
+
+       OVER.
+      ** indicate that sample program has finished
+           DISPLAY 'AMQ0PTL4 end'.
+           MOVE ZERO TO RETURN-CODE.
+           GOBACK.
+
+
+      ****************************************************************
+      *                                                              *
+      *   S U B R O U T I N E S                                      *
+      *                                                              *
+      ****************************************************************
+
+       MQ-CONNECT.
+      ****************************************************************
+      *                                                              *
+      *   Connect to default queue manager                           *
+      *                                                              *
+      ****************************************************************
+           CALL 'MQCONN'
+                USING QM-NAME,
+                      HCONN,
+                      COMPLETION-CODE,
+                      CON-REASON.
+
+      *      report reason and stop if it failed
+           IF COMPLETION-CODE IS EQUAL TO MQCC-FAILED
+             DISPLAY 'MQCONN ended with reason code ' CON-REASON
+             MOVE CON-REASON TO RETURN-CODE
+             GOBACK
+             END-IF.
+
+       READ-DIST-LIST.
+      ****************************************************************
+      *                                                              *
+      *    Display prompt for the name of the target queue           *
+      *                                                              *
+      ****************************************************************
+           DISPLAY 'Please enter your distribution list as ',
+                   'queue/queue manager pairs.'.
+           DISPLAY 'Sample allows a maximum of 10 pairs.'.
+           DISPLAY ' '.
+           DISPLAY 'Enter ENDLIST (UPPERCASE) as queue to end the list'.
+           DISPLAY ' '.
+           DISPLAY 'Please enter the first target queue '.
+
+      ** get the target queue from StdIn.
+           ACCEPT TARGET-QUEUE.
+
+           IF TARGET-QUEUE NOT EQUAL SPACES THEN
+             ADD 1 TO NUM-QUEUES.
+
+           DISPLAY 'Now the queue manager (blank implies local qmgr)'.
+
+      ** get the target queue manager from StdIn.
+           ACCEPT TARGET-QUEUE-MANAGER.
+
+           PERFORM GET-INPUT WITH TEST BEFORE
+            UNTIL TARGET-QUEUE = 'ENDLIST'
+
+           MOVE NUM-QUEUES TO DISPLAY-NUM-QUEUES.
+           DISPLAY 'You have entered a distribution list of ',
+                    DISPLAY-NUM-QUEUES,
+                   ' target queues'.
+
+
+       GET-INPUT.
+      ****************************************************************
+      *                                                              *
+      *    Display prompt for the name of the target queue           *
+      *                                                              *
+      ****************************************************************
+
+           MOVE TARGET-QUEUE         TO MQOR-OBJECTNAME(NUM-QUEUES).
+           MOVE TARGET-QUEUE-MANAGER TO MQOR-OBJECTQMGRNAME(NUM-QUEUES).
+
+           MOVE SPACES TO TARGET-QUEUE.
+           MOVE SPACES TO TARGET-QUEUE-MANAGER.
+
+           IF NUM-QUEUES LESS THAN 10
+            DISPLAY 'Please enter target queue (Enter ENDLIST to end).'
+            ACCEPT TARGET-QUEUE
+
+            IF TARGET-QUEUE NOT EQUAL 'ENDLIST' THEN
+             DISPLAY 'Now the queue manager'
+             ACCEPT TARGET-QUEUE-MANAGER
+             ADD  1 TO NUM-QUEUES
+            END-IF
+
+           ELSE
+            MOVE SPACES TO TARGET-QUEUE
+           END-IF.
+
+       OPEN-QUEUES.
+      ****************************************************************
+      *                                                              *
+      *   Open the target message queues for output (and fail if     *
+      *   MQM is quiescing)                                          *
+      *                                                              *
+      ****************************************************************
+
+           ADD MQOO-OUTPUT,
+               MQOO-FAIL-IF-QUIESCING
+                                      GIVING OPTIONS.
+           CALL 'MQOPEN'
+                USING HCONN,
+                      OBJECT-DESCRIPTOR,
+                      OPTIONS,
+                      Q-HANDLE,
+                      OPEN-CODE,
+                      REASON.
+
+      *      report reason, if any; stop if failed
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             MOVE 'MQOPEN' TO MQ-VERB
+             PERFORM ERROR-ROUTINE
+             END-IF.
+
+           IF OPEN-CODE IS EQUAL TO MQCC-FAILED
+             DISPLAY 'unable to open any target queues for output'
+             MOVE REASON TO RETURN-CODE
+             GOBACK
+             END-IF.
+
+       PUT-MESSAGE.
+      ****************************************************************
+      *                                                              *
+      *   Put request message to the target queues                   *
+      *                                                              *
+      ****************************************************************
+
+      **   Display prompt for the message
+           DISPLAY 'Please enter the message text '.
+
+           MOVE SPACES TO BUFFER.
+           ACCEPT BUFFER.
+
+           CALL 'MQPUT'
+                USING HCONN,
+                      Q-HANDLE,
+                      MESSAGE-DESCRIPTOR,
+                      PMOPTIONS,
+                      BUFFER-LENGTH,
+                      BUFFER,
+                      COMPLETION-CODE,
+                      REASON.
+
+      *      report reason, if any
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             MOVE 'MQPUT' TO MQ-VERB
+             PERFORM ERROR-ROUTINE
+             END-IF.
+
+       CLOSE-QUEUES.
+      ****************************************************************
+      *                                                              *
+      *   Close the target queues                                    *
+      *                                                              *
+      ****************************************************************
+
+           MOVE MQCO-NONE TO OPTIONS.
+
+           CALL 'MQCLOSE'
+                USING HCONN,
+                      Q-HANDLE,
+                      OPTIONS,
+                      COMPLETION-CODE,
+                      REASON.
+
+      *      report reason, if any
+           IF REASON IS NOT EQUAL TO MQRC-NONE
+             MOVE 'MQCLOSE' TO MQ-VERB
+             PERFORM ERROR-ROUTINE
+             END-IF.
+
+       MQ-DISCONNECT.
+      ****************************************************************
+      *                                                              *
+      *  Disconnect from queue manager (if not previously connected) *
+      *                                                              *
+      ****************************************************************
+
+           IF CON-REASON IS NOT EQUAL TO MQRC-ALREADY-CONNECTED
+             CALL 'MQDISC'
+                  USING HCONN,
+                        COMPLETION-CODE,
+                        REASON
+
+      *      report reason, if any
+             IF REASON IS NOT EQUAL TO MQRC-NONE
+               DISPLAY 'MQDISC ended with reason code ' REASON
+             END-IF
+           END-IF.
+
+       ERROR-ROUTINE.
+      ****************************************************************
+      * If the call returned 'multiple reasons' then we should show  *
+      * the response records.                                        *
+      * Loop through the response records and display them if they   *
+      * are not zero.                                                *
+      * For simplicity the queue name and queue manager names are    *
+      * truncated when displaying the error message                  *
+      ****************************************************************
+
+             MOVE ZERO TO RR-COUNT.
+
+             DISPLAY ' '.
+
+             IF REASON IS EQUAL MQRC-MULTIPLE-REASONS THEN
+               PERFORM SHOW-RRS WITH TEST BEFORE
+                 UNTIL RR-COUNT = NUM-QUEUES
+             ELSE
+               DISPLAY MQ-VERB ' ended with reason code ' REASON
+             END-IF.
+
+             DISPLAY ' '.
+
+       SHOW-RRS.
+      **********
+             ADD 1 to RR-COUNT.
+
+             IF MQRR-COMPCODE(RR-COUNT) IS NOT EQUAL MQCC-OK AND,
+                MQRR-REASON(RR-COUNT)   IS NOT EQUAL MQRC-NONE THEN
+
+                MOVE MQOR-OBJECTNAME(RR-COUNT)     TO ERR-Q
+                MOVE MQOR-OBJECTQMGRNAME(RR-COUNT) TO ERR-QMGR
+                MOVE MQRR-COMPCODE(RR-COUNT)       TO ERR-CC
+                MOVE MQRR-REASON(RR-COUNT)         TO ERR-RC
+
+                DISPLAY ERR-MESSAGE
+                END-IF.
+
+      ****************************************************************
+      *                                                              *
+      * END OF AMQ0PTL4                                              *
+      *                                                              *
+      ****************************************************************
