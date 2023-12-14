@@ -20,6 +20,9 @@ https://github.com/vengoal/qmqmsamp/blob/main/qcbllesrc/MBRLIST.txt
 
 ## qcsrc C samples description
 https://github.com/vengoal/qmqmsamp/blob/main/qcsrc/MBRLIST.txt
+<ul>
+  <li><a href="https://www.ibm.com/docs/en/ibm-mq/9.3?topic=i-preparing-c-programs-in">Preparing C programs in IBM i</a></li>
+</ul>
 
 ## qclsrc CL samples description
 https://github.com/vengoal/qmqmsamp/blob/main/qclsrc/MBRLIST.txt
