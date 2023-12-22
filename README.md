@@ -1,5 +1,5 @@
 # qmqmsamp
-IBM i (AS/400) QMQMSAMP Library Sample program 
+IBM i (AS/400) MQ QMQMSAMP Library Sample program 
 
 ## qrpglesrc ILE RPG samples description
 https://github.com/vengoal/qmqmsamp/blob/main/qrpglesrc/MBRLIST.txt
